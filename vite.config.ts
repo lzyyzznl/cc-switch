@@ -24,6 +24,13 @@ export default defineConfig(({ command }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@tauri-apps/api/core": path.resolve(__dirname, "./src/tauri-shim/core.ts"),
+      "@tauri-apps/api/event": path.resolve(__dirname, "./src/tauri-shim/event.ts"),
+      "@tauri-apps/api/app": path.resolve(__dirname, "./src/tauri-shim/app.ts"),
+      "@tauri-apps/api/path": path.resolve(__dirname, "./src/tauri-shim/path.ts"),
+      "@tauri-apps/api/window": path.resolve(__dirname, "./src/tauri-shim/window.ts"),
+      "@tauri-apps/plugin-dialog": path.resolve(__dirname, "./src/tauri-shim/plugin-dialog.ts"),
+      "@tauri-apps/plugin-process": path.resolve(__dirname, "./src/tauri-shim/plugin-process.ts"),
     },
   },
   clearScreen: false,

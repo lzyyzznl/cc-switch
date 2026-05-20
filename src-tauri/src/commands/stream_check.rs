@@ -8,13 +8,12 @@ use crate::services::stream_check::{
 };
 use crate::store::AppState;
 use std::collections::HashSet;
-use tauri::State;
+use std::sync::Arc;
 
 /// 流式健康检查（单个供应商）
-#[tauri::command]
 pub async fn stream_check_provider(
-    state: State<'_, AppState>,
-    copilot_state: State<'_, CopilotAuthState>,
+    state: Arc<AppState>,
+    copilot_state: Arc<CopilotAuthState>,
     app_type: AppType,
     provider_id: String,
 ) -> Result<StreamCheckResult, AppError> {
@@ -55,10 +54,9 @@ pub async fn stream_check_provider(
 }
 
 /// 批量流式健康检查
-#[tauri::command]
 pub async fn stream_check_all_providers(
-    state: State<'_, AppState>,
-    copilot_state: State<'_, CopilotAuthState>,
+    state: Arc<AppState>,
+    copilot_state: Arc<CopilotAuthState>,
     app_type: AppType,
     proxy_targets_only: bool,
 ) -> Result<Vec<(String, StreamCheckResult)>, AppError> {
@@ -148,15 +146,13 @@ pub async fn stream_check_all_providers(
 }
 
 /// 获取流式检查配置
-#[tauri::command]
-pub fn get_stream_check_config(state: State<'_, AppState>) -> Result<StreamCheckConfig, AppError> {
+pub fn get_stream_check_config(state: Arc<AppState>) -> Result<StreamCheckConfig, AppError> {
     state.db.get_stream_check_config()
 }
 
 /// 保存流式检查配置
-#[tauri::command]
 pub fn save_stream_check_config(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     config: StreamCheckConfig,
 ) -> Result<(), AppError> {
     state.db.save_stream_check_config(&config)
@@ -164,7 +160,7 @@ pub fn save_stream_check_config(
 
 async fn resolve_copilot_auth_override(
     provider: &crate::provider::Provider,
-    copilot_state: &State<'_, CopilotAuthState>,
+    copilot_state: &Arc<CopilotAuthState>,
 ) -> Result<Option<crate::proxy::providers::AuthInfo>, AppError> {
     let is_copilot = is_copilot_provider(provider);
 
@@ -197,7 +193,7 @@ async fn resolve_copilot_auth_override(
 
 async fn resolve_copilot_base_url_override(
     provider: &crate::provider::Provider,
-    copilot_state: &State<'_, CopilotAuthState>,
+    copilot_state: &Arc<CopilotAuthState>,
 ) -> Result<Option<String>, AppError> {
     let is_copilot = is_copilot_provider(provider);
     let is_full_url = provider
@@ -242,7 +238,7 @@ async fn resolve_claude_api_format_override(
     app_type: &AppType,
     provider: &crate::provider::Provider,
     config: &StreamCheckConfig,
-    copilot_state: &State<'_, CopilotAuthState>,
+    copilot_state: &Arc<CopilotAuthState>,
     auth_override: Option<&crate::proxy::providers::AuthInfo>,
 ) -> Result<Option<String>, AppError> {
     if *app_type != AppType::Claude {

@@ -1,11 +1,11 @@
 #![allow(non_snake_case)]
 
-mod auth;
+pub mod auth;
 mod balance;
-mod codex_oauth;
+pub mod codex_oauth;
 mod coding_plan;
 mod config;
-mod copilot;
+pub mod copilot;
 mod deeplink;
 mod env;
 mod failover;
@@ -13,7 +13,7 @@ mod global_proxy;
 mod hermes;
 mod import_export;
 mod mcp;
-mod misc;
+pub mod misc;
 mod model_fetch;
 mod omo;
 mod openclaw;

@@ -5,12 +5,11 @@ use crate::services::usage_stats::*;
 use crate::store::AppState;
 use rust_decimal::Decimal;
 use std::str::FromStr;
-use tauri::State;
+use std::sync::Arc;
 
 /// 获取使用量汇总
-#[tauri::command]
 pub fn get_usage_summary(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     start_date: Option<i64>,
     end_date: Option<i64>,
     app_type: Option<String>,
@@ -21,9 +20,8 @@ pub fn get_usage_summary(
 }
 
 /// 获取按 app_type 拆分的使用量汇总
-#[tauri::command]
 pub fn get_usage_summary_by_app(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     start_date: Option<i64>,
     end_date: Option<i64>,
 ) -> Result<Vec<UsageSummaryByApp>, AppError> {
@@ -31,9 +29,8 @@ pub fn get_usage_summary_by_app(
 }
 
 /// 获取每日趋势
-#[tauri::command]
 pub fn get_usage_trends(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     start_date: Option<i64>,
     end_date: Option<i64>,
     app_type: Option<String>,
@@ -44,9 +41,8 @@ pub fn get_usage_trends(
 }
 
 /// 获取 Provider 统计
-#[tauri::command]
 pub fn get_provider_stats(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     start_date: Option<i64>,
     end_date: Option<i64>,
     app_type: Option<String>,
@@ -57,9 +53,8 @@ pub fn get_provider_stats(
 }
 
 /// 获取模型统计
-#[tauri::command]
 pub fn get_model_stats(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     start_date: Option<i64>,
     end_date: Option<i64>,
     app_type: Option<String>,
@@ -70,9 +65,8 @@ pub fn get_model_stats(
 }
 
 /// 获取请求日志列表
-#[tauri::command]
 pub fn get_request_logs(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     filters: LogFilters,
     page: u32,
     page_size: u32,
@@ -81,17 +75,15 @@ pub fn get_request_logs(
 }
 
 /// 获取单个请求详情
-#[tauri::command]
 pub fn get_request_detail(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     request_id: String,
 ) -> Result<Option<RequestLogDetail>, AppError> {
     state.db.get_request_detail(&request_id)
 }
 
 /// 获取模型定价列表
-#[tauri::command]
-pub fn get_model_pricing(state: State<'_, AppState>) -> Result<Vec<ModelPricingInfo>, AppError> {
+pub fn get_model_pricing(state: Arc<AppState>) -> Result<Vec<ModelPricingInfo>, AppError> {
     log::info!("获取模型定价列表");
     state.db.ensure_model_pricing_seeded()?;
 
@@ -140,9 +132,8 @@ pub fn get_model_pricing(state: State<'_, AppState>) -> Result<Vec<ModelPricingI
 }
 
 /// 更新模型定价
-#[tauri::command]
 pub fn update_model_pricing(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     model_id: String,
     display_name: String,
     input_cost: String,
@@ -217,9 +208,8 @@ pub fn update_model_pricing(
 }
 
 /// 检查 Provider 使用限额
-#[tauri::command]
 pub fn check_provider_limits(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     provider_id: String,
     app_type: String,
 ) -> Result<crate::services::usage_stats::ProviderLimitStatus, AppError> {
@@ -227,8 +217,7 @@ pub fn check_provider_limits(
 }
 
 /// 删除模型定价
-#[tauri::command]
-pub fn delete_model_pricing(state: State<'_, AppState>, model_id: String) -> Result<(), AppError> {
+pub fn delete_model_pricing(state: Arc<AppState>, model_id: String) -> Result<(), AppError> {
     let db = state.db.clone();
     let conn = crate::database::lock_conn!(db.conn);
 
@@ -243,9 +232,8 @@ pub fn delete_model_pricing(state: State<'_, AppState>, model_id: String) -> Res
 }
 
 /// 手动触发会话日志同步
-#[tauri::command]
 pub fn sync_session_usage(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
 ) -> Result<crate::services::session_usage::SessionSyncResult, AppError> {
     // 同步 Claude 会话日志
     let mut result = crate::services::session_usage::sync_claude_session_logs(&state.db)?;
@@ -280,9 +268,8 @@ pub fn sync_session_usage(
 }
 
 /// 获取数据来源分布
-#[tauri::command]
 pub fn get_usage_data_sources(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
 ) -> Result<Vec<crate::services::session_usage::DataSourceSummary>, AppError> {
     crate::services::session_usage::get_data_source_breakdown(&state.db)
 }

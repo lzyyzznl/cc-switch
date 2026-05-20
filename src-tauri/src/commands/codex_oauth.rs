@@ -9,7 +9,6 @@ use crate::proxy::providers::codex_oauth_auth::CodexOAuthManager;
 use crate::services::model_fetch::FetchedModel;
 use crate::services::subscription::{query_codex_quota, CredentialStatus, SubscriptionQuota};
 use std::sync::Arc;
-use tauri::State;
 use tokio::sync::RwLock;
 
 /// Codex OAuth 认证状态
@@ -21,10 +20,9 @@ pub struct CodexOAuthState(pub Arc<RwLock<CodexOAuthManager>>);
 /// - 没有任何账号时返回 `not_found`，前端 `SubscriptionQuotaView` 会静默不渲染
 /// - 复用 `services::subscription::query_codex_quota`，因此 wham/usage 端点协议
 ///   与 Codex CLI 路径完全一致
-#[tauri::command(rename_all = "camelCase")]
 pub async fn get_codex_oauth_quota(
     account_id: Option<String>,
-    state: State<'_, CodexOAuthState>,
+    state: Arc<CodexOAuthState>,
 ) -> Result<SubscriptionQuota, String> {
     let manager = state.0.read().await;
 
@@ -63,10 +61,9 @@ pub async fn get_codex_oauth_quota(
 /// ChatGPT Codex 反代使用 `chatgpt.com/backend-api/codex/*`，不是 OpenAI 兼容
 /// `/v1/models`。这里复用托管 OAuth 账号的 access_token，直接读取 Codex 后端
 /// 暴露的模型列表端点。
-#[tauri::command(rename_all = "camelCase")]
 pub async fn get_codex_oauth_models(
     account_id: Option<String>,
-    state: State<'_, CodexOAuthState>,
+    state: Arc<CodexOAuthState>,
 ) -> Result<Vec<FetchedModel>, String> {
     let manager = state.0.read().await;
     let resolved = match account_id

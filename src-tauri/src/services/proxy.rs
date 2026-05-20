@@ -15,6 +15,7 @@ use crate::services::provider::{
 use serde_json::{json, Map, Value};
 use std::str::FromStr;
 use std::sync::Arc;
+#[cfg(not(feature = "server_only"))]
 use tauri::Emitter;
 use tokio::sync::RwLock;
 
@@ -56,7 +57,10 @@ pub struct ProxyService {
     db: Arc<Database>,
     server: Arc<RwLock<Option<ProxyServer>>>,
     /// AppHandle，用于传递给 ProxyServer 以支持故障转移时的 UI 更新
+    #[cfg(not(feature = "server_only"))]
     app_handle: Arc<RwLock<Option<tauri::AppHandle>>>,
+    #[cfg(feature = "server_only")]
+    app_handle: Arc<RwLock<Option<()>>>,
     switch_locks: SwitchLockManager,
 }
 
@@ -301,6 +305,7 @@ impl ProxyService {
     }
 
     /// 设置 AppHandle（在应用初始化时调用）
+    #[cfg(not(feature = "server_only"))]
     pub fn set_app_handle(&self, handle: tauri::AppHandle) {
         futures::executor::block_on(async {
             *self.app_handle.write().await = Some(handle);
@@ -540,6 +545,7 @@ impl ProxyService {
             {
                 if let Ok(Some(provider)) = self.db.get_provider_by_id(&current_id, app_type_str) {
                     if provider.category.as_deref() == Some("official") {
+                        #[cfg(not(feature = "server_only"))]
                         if let Some(handle) = self.app_handle.read().await.as_ref() {
                             let _ = handle.emit(
                                 "proxy-official-warning",

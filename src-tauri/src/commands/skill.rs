@@ -14,7 +14,6 @@ use crate::services::skill::{
 use crate::store::AppState;
 use std::str::FromStr;
 use std::sync::Arc;
-use tauri::State;
 
 /// SkillService 状态包装
 pub struct SkillServiceState(pub Arc<SkillService>);
@@ -27,17 +26,14 @@ fn parse_app_type(app: &str) -> Result<AppType, String> {
 // ========== 统一管理命令 ==========
 
 /// 获取所有已安装的 Skills
-#[tauri::command]
-pub fn get_installed_skills(app_state: State<'_, AppState>) -> Result<Vec<InstalledSkill>, String> {
+pub fn get_installed_skills(app_state: Arc<AppState>) -> Result<Vec<InstalledSkill>, String> {
     SkillService::get_all_installed(&app_state.db).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn get_skill_backups() -> Result<Vec<SkillBackupEntry>, String> {
     SkillService::list_backups().map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn delete_skill_backup(backup_id: String) -> Result<bool, String> {
     SkillService::delete_backup(&backup_id).map_err(|e| e.to_string())?;
     Ok(true)
@@ -48,12 +44,11 @@ pub fn delete_skill_backup(backup_id: String) -> Result<bool, String> {
 /// 参数：
 /// - skill: 从发现列表获取的技能信息
 /// - current_app: 当前选中的应用，安装后默认启用该应用
-#[tauri::command]
 pub async fn install_skill_unified(
     skill: DiscoverableSkill,
     current_app: String,
-    service: State<'_, SkillServiceState>,
-    app_state: State<'_, AppState>,
+    service: Arc<SkillServiceState>,
+    app_state: Arc<AppState>,
 ) -> Result<InstalledSkill, String> {
     let app_type = parse_app_type(&current_app)?;
 
@@ -65,19 +60,17 @@ pub async fn install_skill_unified(
 }
 
 /// 卸载 Skill（新版统一卸载）
-#[tauri::command]
 pub fn uninstall_skill_unified(
     id: String,
-    app_state: State<'_, AppState>,
+    app_state: Arc<AppState>,
 ) -> Result<SkillUninstallResult, String> {
     SkillService::uninstall(&app_state.db, &id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn restore_skill_backup(
     backup_id: String,
     current_app: String,
-    app_state: State<'_, AppState>,
+    app_state: Arc<AppState>,
 ) -> Result<InstalledSkill, String> {
     let app_type = parse_app_type(&current_app)?;
     SkillService::restore_from_backup(&app_state.db, &backup_id, &app_type)
@@ -85,12 +78,11 @@ pub fn restore_skill_backup(
 }
 
 /// 切换 Skill 的应用启用状态
-#[tauri::command]
 pub fn toggle_skill_app(
     id: String,
     app: String,
     enabled: bool,
-    app_state: State<'_, AppState>,
+    app_state: Arc<AppState>,
 ) -> Result<bool, String> {
     let app_type = parse_app_type(&app)?;
     SkillService::toggle_app(&app_state.db, &id, &app_type, enabled).map_err(|e| e.to_string())?;
@@ -98,18 +90,16 @@ pub fn toggle_skill_app(
 }
 
 /// 扫描未管理的 Skills
-#[tauri::command]
 pub fn scan_unmanaged_skills(
-    app_state: State<'_, AppState>,
+    app_state: Arc<AppState>,
 ) -> Result<Vec<UnmanagedSkill>, String> {
     SkillService::scan_unmanaged(&app_state.db).map_err(|e| e.to_string())
 }
 
 /// 从应用目录导入 Skills
-#[tauri::command]
 pub fn import_skills_from_apps(
     imports: Vec<ImportSkillSelection>,
-    app_state: State<'_, AppState>,
+    app_state: Arc<AppState>,
 ) -> Result<Vec<InstalledSkill>, String> {
     SkillService::import_from_apps(&app_state.db, imports).map_err(|e| e.to_string())
 }
@@ -117,10 +107,9 @@ pub fn import_skills_from_apps(
 // ========== 发现功能命令 ==========
 
 /// 发现可安装的 Skills（从仓库获取）
-#[tauri::command]
 pub async fn discover_available_skills(
-    service: State<'_, SkillServiceState>,
-    app_state: State<'_, AppState>,
+    service: Arc<SkillServiceState>,
+    app_state: Arc<AppState>,
 ) -> Result<Vec<DiscoverableSkill>, String> {
     let repos = app_state.db.get_skill_repos().map_err(|e| e.to_string())?;
     service
@@ -131,10 +120,9 @@ pub async fn discover_available_skills(
 }
 
 /// 检查 Skills 更新
-#[tauri::command]
 pub async fn check_skill_updates(
-    service: State<'_, SkillServiceState>,
-    app_state: State<'_, AppState>,
+    service: Arc<SkillServiceState>,
+    app_state: Arc<AppState>,
 ) -> Result<Vec<SkillUpdateInfo>, String> {
     service
         .0
@@ -144,11 +132,10 @@ pub async fn check_skill_updates(
 }
 
 /// 更新单个 Skill
-#[tauri::command]
 pub async fn update_skill(
     id: String,
-    service: State<'_, SkillServiceState>,
-    app_state: State<'_, AppState>,
+    service: Arc<SkillServiceState>,
+    app_state: Arc<AppState>,
 ) -> Result<InstalledSkill, String> {
     service
         .0
@@ -158,16 +145,14 @@ pub async fn update_skill(
 }
 
 /// 迁移 Skill 存储位置
-#[tauri::command]
 pub async fn migrate_skill_storage(
     target: SkillStorageLocation,
-    app_state: State<'_, AppState>,
+    app_state: Arc<AppState>,
 ) -> Result<MigrationResult, String> {
     SkillService::migrate_storage(&app_state.db, target).map_err(|e| e.to_string())
 }
 
 /// 搜索 skills.sh 公共目录
-#[tauri::command]
 pub async fn search_skills_sh(
     query: String,
     limit: usize,
@@ -181,10 +166,9 @@ pub async fn search_skills_sh(
 // ========== 兼容旧 API 的命令 ==========
 
 /// 获取技能列表（兼容旧 API）
-#[tauri::command]
 pub async fn get_skills(
-    service: State<'_, SkillServiceState>,
-    app_state: State<'_, AppState>,
+    service: Arc<SkillServiceState>,
+    app_state: Arc<AppState>,
 ) -> Result<Vec<Skill>, String> {
     let repos = app_state.db.get_skill_repos().map_err(|e| e.to_string())?;
     service
@@ -195,11 +179,10 @@ pub async fn get_skills(
 }
 
 /// 获取指定应用的技能列表（兼容旧 API）
-#[tauri::command]
 pub async fn get_skills_for_app(
     app: String,
-    service: State<'_, SkillServiceState>,
-    app_state: State<'_, AppState>,
+    service: Arc<SkillServiceState>,
+    app_state: Arc<AppState>,
 ) -> Result<Vec<Skill>, String> {
     // 新版本不再区分应用，统一返回所有技能
     let _ = parse_app_type(&app)?; // 验证 app 参数有效
@@ -207,22 +190,20 @@ pub async fn get_skills_for_app(
 }
 
 /// 安装技能（兼容旧 API）
-#[tauri::command]
 pub async fn install_skill(
     directory: String,
-    service: State<'_, SkillServiceState>,
-    app_state: State<'_, AppState>,
+    service: Arc<SkillServiceState>,
+    app_state: Arc<AppState>,
 ) -> Result<bool, String> {
     install_skill_for_app("claude".to_string(), directory, service, app_state).await
 }
 
 /// 安装指定应用的技能（兼容旧 API）
-#[tauri::command]
 pub async fn install_skill_for_app(
     app: String,
     directory: String,
-    service: State<'_, SkillServiceState>,
-    app_state: State<'_, AppState>,
+    service: Arc<SkillServiceState>,
+    app_state: Arc<AppState>,
 ) -> Result<bool, String> {
     let app_type = parse_app_type(&app)?;
 
@@ -262,20 +243,18 @@ pub async fn install_skill_for_app(
 }
 
 /// 卸载技能（兼容旧 API）
-#[tauri::command]
 pub fn uninstall_skill(
     directory: String,
-    app_state: State<'_, AppState>,
+    app_state: Arc<AppState>,
 ) -> Result<SkillUninstallResult, String> {
     uninstall_skill_for_app("claude".to_string(), directory, app_state)
 }
 
 /// 卸载指定应用的技能（兼容旧 API）
-#[tauri::command]
 pub fn uninstall_skill_for_app(
     app: String,
     directory: String,
-    app_state: State<'_, AppState>,
+    app_state: Arc<AppState>,
 ) -> Result<SkillUninstallResult, String> {
     let _ = parse_app_type(&app)?; // 验证参数
 
@@ -293,14 +272,12 @@ pub fn uninstall_skill_for_app(
 // ========== 仓库管理命令 ==========
 
 /// 获取技能仓库列表
-#[tauri::command]
-pub fn get_skill_repos(app_state: State<'_, AppState>) -> Result<Vec<SkillRepo>, String> {
+pub fn get_skill_repos(app_state: Arc<AppState>) -> Result<Vec<SkillRepo>, String> {
     app_state.db.get_skill_repos().map_err(|e| e.to_string())
 }
 
 /// 添加技能仓库
-#[tauri::command]
-pub fn add_skill_repo(repo: SkillRepo, app_state: State<'_, AppState>) -> Result<bool, String> {
+pub fn add_skill_repo(repo: SkillRepo, app_state: Arc<AppState>) -> Result<bool, String> {
     app_state
         .db
         .save_skill_repo(&repo)
@@ -309,11 +286,10 @@ pub fn add_skill_repo(repo: SkillRepo, app_state: State<'_, AppState>) -> Result
 }
 
 /// 删除技能仓库
-#[tauri::command]
 pub fn remove_skill_repo(
     owner: String,
     name: String,
-    app_state: State<'_, AppState>,
+    app_state: Arc<AppState>,
 ) -> Result<bool, String> {
     app_state
         .db
@@ -323,11 +299,10 @@ pub fn remove_skill_repo(
 }
 
 /// 从 ZIP 文件安装 Skills
-#[tauri::command]
 pub fn install_skills_from_zip(
     file_path: String,
     current_app: String,
-    app_state: State<'_, AppState>,
+    app_state: Arc<AppState>,
 ) -> Result<Vec<InstalledSkill>, String> {
     let app_type = parse_app_type(&current_app)?;
     let path = std::path::Path::new(&file_path);

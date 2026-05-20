@@ -120,6 +120,19 @@ impl serde::Serialize for AppError {
     }
 }
 
+impl axum::response::IntoResponse for AppError {
+    fn into_response(self) -> axum::response::Response {
+        let code = match &self {
+            AppError::InvalidInput(_) => axum::http::StatusCode::BAD_REQUEST,
+            AppError::Config(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::Database(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            _ => axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        let body = serde_json::json!({ "error": self.to_string() });
+        (code, axum::Json(body)).into_response()
+    }
+}
+
 /// 格式化为 JSON 错误字符串，前端可解析为结构化错误
 pub fn format_skill_error(
     code: &str,

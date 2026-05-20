@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
-use tauri::AppHandle;
+use std::sync::Arc;
+use crate::store::AppState;
 
 fn merge_settings_for_save(
     mut incoming: crate::settings::AppSettings,
@@ -25,13 +26,11 @@ fn merge_settings_for_save(
 }
 
 /// 获取设置
-#[tauri::command]
 pub async fn get_settings() -> Result<crate::settings::AppSettings, String> {
     Ok(crate::settings::get_settings_for_frontend())
 }
 
 /// 保存设置
-#[tauri::command]
 pub async fn save_settings(settings: crate::settings::AppSettings) -> Result<bool, String> {
     let existing = crate::settings::get_settings();
     let merged = merge_settings_for_save(settings, &existing);
@@ -40,43 +39,36 @@ pub async fn save_settings(settings: crate::settings::AppSettings) -> Result<boo
 }
 
 /// 重启应用程序（当 app_config_dir 变更后使用）
-#[tauri::command]
-pub async fn restart_app(app: AppHandle) -> Result<bool, String> {
-    crate::save_window_state_before_exit(&app);
-
-    // 在后台延迟重启，让函数有时间返回响应
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        app.restart();
-    });
-    Ok(true)
+/// Server mode: app restart is not available via Tauri runtime.
+pub async fn restart_app() -> Result<bool, String> {
+    Err("Server mode: app restart is not available".to_string())
 }
 
-/// 获取 app_config_dir 覆盖配置 (从 Store)
-#[tauri::command]
-pub async fn get_app_config_dir_override(app: AppHandle) -> Result<Option<String>, String> {
-    Ok(crate::app_store::refresh_app_config_dir_override(&app)
+/// 获取 app_config_dir 覆盖配置 (从缓存)
+pub async fn get_app_config_dir_override() -> Result<Option<String>, String> {
+    Ok(crate::app_store::get_app_config_dir_override()
         .map(|p| p.to_string_lossy().to_string()))
 }
 
-/// 设置 app_config_dir 覆盖配置 (到 Store)
-#[tauri::command]
+/// 设置 app_config_dir 覆盖配置 (server mode: not yet available via Store)
 pub async fn set_app_config_dir_override(
-    app: AppHandle,
     path: Option<String>,
 ) -> Result<bool, String> {
-    crate::app_store::set_app_config_dir_to_store(&app, path.as_deref())?;
+    // TODO: server mode persistence for app_config_dir_override
+    log::info!("set_app_config_dir_override called with path={path:?} (server mode: not persisted)");
     Ok(true)
 }
 
 /// 设置开机自启
-#[tauri::command]
 pub async fn set_auto_launch(enabled: bool) -> Result<bool, String> {
+    #[cfg(not(feature = "server_only"))]
     if enabled {
         crate::auto_launch::enable_auto_launch().map_err(|e| format!("启用开机自启失败: {e}"))?;
     } else {
         crate::auto_launch::disable_auto_launch().map_err(|e| format!("禁用开机自启失败: {e}"))?;
     }
+    #[cfg(feature = "server_only")]
+    log::info!("set_auto_launch({enabled}) called in server mode (not available)");
     Ok(true)
 }
 
@@ -207,23 +199,26 @@ mod tests {
 }
 
 /// 获取开机自启状态
-#[tauri::command]
 pub async fn get_auto_launch_status() -> Result<bool, String> {
-    crate::auto_launch::is_auto_launch_enabled().map_err(|e| format!("获取开机自启状态失败: {e}"))
+    #[cfg(not(feature = "server_only"))]
+    {
+        return crate::auto_launch::is_auto_launch_enabled()
+            .map_err(|e| format!("获取开机自启状态失败: {e}"));
+    }
+    #[cfg(feature = "server_only")]
+    Ok(false)
 }
 
 /// 获取整流器配置
-#[tauri::command]
 pub async fn get_rectifier_config(
-    state: tauri::State<'_, crate::AppState>,
+    state: Arc<AppState>,
 ) -> Result<crate::proxy::types::RectifierConfig, String> {
     state.db.get_rectifier_config().map_err(|e| e.to_string())
 }
 
 /// 设置整流器配置
-#[tauri::command]
 pub async fn set_rectifier_config(
-    state: tauri::State<'_, crate::AppState>,
+    state: Arc<AppState>,
     config: crate::proxy::types::RectifierConfig,
 ) -> Result<bool, String> {
     state
@@ -234,17 +229,15 @@ pub async fn set_rectifier_config(
 }
 
 /// 获取优化器配置
-#[tauri::command]
 pub async fn get_optimizer_config(
-    state: tauri::State<'_, crate::AppState>,
+    state: Arc<AppState>,
 ) -> Result<crate::proxy::types::OptimizerConfig, String> {
     state.db.get_optimizer_config().map_err(|e| e.to_string())
 }
 
 /// 设置优化器配置
-#[tauri::command]
 pub async fn set_optimizer_config(
-    state: tauri::State<'_, crate::AppState>,
+    state: Arc<AppState>,
     config: crate::proxy::types::OptimizerConfig,
 ) -> Result<bool, String> {
     // Validate cache_ttl: only allow known values
@@ -264,9 +257,8 @@ pub async fn set_optimizer_config(
 }
 
 /// 获取 Copilot 优化器配置
-#[tauri::command]
 pub async fn get_copilot_optimizer_config(
-    state: tauri::State<'_, crate::AppState>,
+    state: Arc<AppState>,
 ) -> Result<crate::proxy::types::CopilotOptimizerConfig, String> {
     state
         .db
@@ -275,9 +267,8 @@ pub async fn get_copilot_optimizer_config(
 }
 
 /// 设置 Copilot 优化器配置
-#[tauri::command]
 pub async fn set_copilot_optimizer_config(
-    state: tauri::State<'_, crate::AppState>,
+    state: Arc<AppState>,
     config: crate::proxy::types::CopilotOptimizerConfig,
 ) -> Result<bool, String> {
     state
@@ -288,17 +279,15 @@ pub async fn set_copilot_optimizer_config(
 }
 
 /// 获取日志配置
-#[tauri::command]
 pub async fn get_log_config(
-    state: tauri::State<'_, crate::AppState>,
+    state: Arc<AppState>,
 ) -> Result<crate::proxy::types::LogConfig, String> {
     state.db.get_log_config().map_err(|e| e.to_string())
 }
 
 /// 设置日志配置
-#[tauri::command]
 pub async fn set_log_config(
-    state: tauri::State<'_, crate::AppState>,
+    state: Arc<AppState>,
     config: crate::proxy::types::LogConfig,
 ) -> Result<bool, String> {
     state

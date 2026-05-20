@@ -9,6 +9,7 @@ use crate::database::Database;
 use crate::error::AppError;
 use std::collections::HashSet;
 use std::sync::Arc;
+#[cfg(not(feature = "server_only"))]
 use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 
@@ -40,7 +41,8 @@ impl FailoverSwitchManager {
     /// - `Err(e)` - 切换过程中发生错误
     pub async fn try_switch(
         &self,
-        app_handle: Option<&tauri::AppHandle>,
+        #[cfg(not(feature = "server_only"))] app_handle: Option<&tauri::AppHandle>,
+        #[cfg(feature = "server_only")] app_handle: Option<&()>,
         app_type: &str,
         provider_id: &str,
         provider_name: &str,
@@ -73,7 +75,8 @@ impl FailoverSwitchManager {
 
     async fn do_switch(
         &self,
-        app_handle: Option<&tauri::AppHandle>,
+        #[cfg(not(feature = "server_only"))] app_handle: Option<&tauri::AppHandle>,
+        #[cfg(feature = "server_only")] app_handle: Option<&()>,
         app_type: &str,
         provider_id: &str,
         provider_name: &str,
@@ -97,6 +100,7 @@ impl FailoverSwitchManager {
 
         let mut switched = false;
 
+        #[cfg(not(feature = "server_only"))]
         if let Some(app) = app_handle {
             if let Some(app_state) = app.try_state::<crate::store::AppState>() {
                 switched = app_state

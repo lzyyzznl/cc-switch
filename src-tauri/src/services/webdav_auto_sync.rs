@@ -4,6 +4,7 @@ use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use serde_json::json;
+#[cfg(not(feature = "server_only"))]
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -85,6 +86,7 @@ fn persist_auto_sync_error(settings: &mut WebDavSyncSettings, error: &AppError) 
     let _ = settings::update_webdav_sync_status(settings.status.clone());
 }
 
+#[cfg(not(feature = "server_only"))]
 fn emit_auto_sync_status_updated(app: &AppHandle, status: &str, error: Option<&str>) {
     let payload = match error {
         Some(message) => json!({
@@ -103,6 +105,7 @@ fn emit_auto_sync_status_updated(app: &AppHandle, status: &str, error: Option<&s
     }
 }
 
+#[cfg(not(feature = "server_only"))]
 async fn run_auto_sync_upload(
     db: &crate::database::Database,
     app: &AppHandle,
@@ -148,6 +151,7 @@ pub fn notify_db_changed(table: &str) {
     let _ = enqueue_change_signal(tx, table);
 }
 
+#[cfg(not(feature = "server_only"))]
 pub fn start_worker(db: Arc<crate::database::Database>, app: tauri::AppHandle) {
     if DB_CHANGE_TX.get().is_some() {
         return;
@@ -164,6 +168,7 @@ pub fn start_worker(db: Arc<crate::database::Database>, app: tauri::AppHandle) {
     });
 }
 
+#[cfg(not(feature = "server_only"))]
 async fn run_worker_loop(
     db: Arc<crate::database::Database>,
     mut rx: Receiver<String>,

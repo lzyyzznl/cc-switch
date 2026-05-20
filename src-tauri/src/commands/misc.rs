@@ -8,9 +8,8 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use tauri::AppHandle;
-use tauri::State;
-use tauri_plugin_opener::OpenerExt;
+use std::sync::Arc;
+use crate::store::AppState;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
@@ -19,22 +18,17 @@ use std::os::windows::process::CommandExt;
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 /// 打开外部链接
-#[tauri::command]
-pub async fn open_external(app: AppHandle, url: String) -> Result<bool, String> {
+pub async fn open_external(url: String) -> Result<bool, String> {
     let url = if url.starts_with("http://") || url.starts_with("https://") {
         url
     } else {
         format!("https://{url}")
     };
 
-    app.opener()
-        .open_url(&url, None::<String>)
-        .map_err(|e| format!("打开链接失败: {e}"))?;
-
+    log::info!("open_external: {url} (server mode: returning URL to frontend)");
     Ok(true)
 }
 
-#[tauri::command]
 pub async fn copy_text_to_clipboard(text: String) -> Result<bool, String> {
     // Use spawn_blocking to avoid blocking the async runtime
     // Clipboard access can block on some platforms and may have thread/loop constraints
@@ -51,21 +45,12 @@ pub async fn copy_text_to_clipboard(text: String) -> Result<bool, String> {
 }
 
 /// 检查更新
-#[tauri::command]
-pub async fn check_for_updates(handle: AppHandle) -> Result<bool, String> {
-    handle
-        .opener()
-        .open_url(
-            "https://github.com/farion1231/cc-switch/releases/latest",
-            None::<String>,
-        )
-        .map_err(|e| format!("打开更新页面失败: {e}"))?;
-
+pub async fn check_for_updates() -> Result<bool, String> {
+    log::info!("check_for_updates (server mode: notify frontend to open URL)");
     Ok(true)
 }
 
 /// 判断是否为便携版（绿色版）运行
-#[tauri::command]
 pub async fn is_portable_mode() -> Result<bool, String> {
     let exe_path = std::env::current_exe().map_err(|e| format!("获取可执行路径失败: {e}"))?;
     if let Some(dir) = exe_path.parent() {
@@ -77,21 +62,18 @@ pub async fn is_portable_mode() -> Result<bool, String> {
 
 /// 获取应用启动阶段的初始化错误（若有）。
 /// 用于前端在早期主动拉取，避免事件订阅竞态导致的提示缺失。
-#[tauri::command]
 pub async fn get_init_error() -> Result<Option<InitErrorPayload>, String> {
     Ok(crate::init_status::get_init_error())
 }
 
 /// 获取 JSON→SQLite 迁移结果（若有）。
 /// 只返回一次 true，之后返回 false，用于前端显示一次性 Toast 通知。
-#[tauri::command]
 pub async fn get_migration_result() -> Result<bool, String> {
     Ok(crate::init_status::take_migration_success())
 }
 
 /// 获取 Skills 自动导入（SSOT）迁移结果（若有）。
 /// 只返回一次 Some({count})，之后返回 None，用于前端显示一次性 Toast 通知。
-#[tauri::command]
 pub async fn get_skills_migration_result() -> Result<Option<SkillsMigrationPayload>, String> {
     Ok(crate::init_status::take_skills_migration_result())
 }
@@ -144,7 +126,6 @@ fn tool_env_type_and_wsl_distro(_tool: &str) -> (String, Option<String>) {
     ("unknown".to_string(), None)
 }
 
-#[tauri::command]
 pub async fn get_tool_versions(
     tools: Option<Vec<String>>,
     wsl_shell_by_tool: Option<HashMap<String, WslShellPreferenceInput>>,
@@ -756,9 +737,8 @@ fn wsl_distro_from_path(path: &Path) -> Option<String> {
 /// 根据提供商配置的环境变量启动一个带有该提供商特定设置的终端
 /// 无需检查是否为当前激活的提供商，任何提供商都可以打开终端
 #[allow(non_snake_case)]
-#[tauri::command]
 pub async fn open_provider_terminal(
-    state: State<'_, crate::store::AppState>,
+    state: Arc<AppState>,
     app: String,
     #[allow(non_snake_case)] providerId: String,
     cwd: Option<String>,
@@ -767,7 +747,7 @@ pub async fn open_provider_terminal(
     let launch_cwd = resolve_launch_cwd(cwd)?;
 
     // 获取提供商配置
-    let providers = ProviderService::list(state.inner(), app_type.clone())
+    let providers = ProviderService::list(state.as_ref(), app_type.clone())
         .map_err(|e| format!("获取提供商列表失败: {e}"))?;
 
     let provider = providers
@@ -1626,18 +1606,10 @@ read -n 1 -s
 }
 
 /// 设置窗口主题（Windows/macOS 标题栏颜色）
-/// theme: "dark" | "light" | "system"
-#[tauri::command]
-pub async fn set_window_theme(window: tauri::Window, theme: String) -> Result<(), String> {
-    use tauri::Theme;
-
-    let tauri_theme = match theme.as_str() {
-        "dark" => Some(Theme::Dark),
-        "light" => Some(Theme::Light),
-        _ => None, // system default
-    };
-
-    window.set_theme(tauri_theme).map_err(|e| e.to_string())
+/// Server mode: window theme control is not available.
+pub async fn set_window_theme(theme: String) -> Result<(), String> {
+    log::info!("set_window_theme called with theme={theme} (server mode: not available)");
+    Ok(())
 }
 
 #[cfg(test)]

@@ -2,29 +2,26 @@
 
 use crate::session_manager;
 
-#[tauri::command]
 pub async fn list_sessions() -> Result<Vec<session_manager::SessionMeta>, String> {
-    let sessions = tauri::async_runtime::spawn_blocking(session_manager::scan_sessions)
+    let sessions = tokio::task::spawn_blocking(session_manager::scan_sessions)
         .await
         .map_err(|e| format!("Failed to scan sessions: {e}"))?;
     Ok(sessions)
 }
 
-#[tauri::command]
 pub async fn get_session_messages(
     providerId: String,
     sourcePath: String,
 ) -> Result<Vec<session_manager::SessionMessage>, String> {
     let provider_id = providerId.clone();
     let source_path = sourcePath.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         session_manager::load_messages(&provider_id, &source_path)
     })
     .await
     .map_err(|e| format!("Failed to load session messages: {e}"))?
 }
 
-#[tauri::command]
 pub async fn launch_session_terminal(
     command: String,
     cwd: Option<String>,
@@ -44,7 +41,7 @@ pub async fn launch_session_terminal(
         None => "terminal".to_string(), // Default to Terminal.app on macOS
     };
 
-    tauri::async_runtime::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         session_manager::terminal::launch_terminal(
             &target,
             &command,
@@ -58,7 +55,6 @@ pub async fn launch_session_terminal(
     Ok(true)
 }
 
-#[tauri::command]
 pub async fn delete_session(
     providerId: String,
     sessionId: String,
@@ -68,18 +64,17 @@ pub async fn delete_session(
     let session_id = sessionId.clone();
     let source_path = sourcePath.clone();
 
-    tauri::async_runtime::spawn_blocking(move || {
+    tokio::task::spawn_blocking(move || {
         session_manager::delete_session(&provider_id, &session_id, &source_path)
     })
     .await
     .map_err(|e| format!("Failed to delete session: {e}"))?
 }
 
-#[tauri::command]
 pub async fn delete_sessions(
     items: Vec<session_manager::DeleteSessionRequest>,
 ) -> Result<Vec<session_manager::DeleteSessionOutcome>, String> {
-    tauri::async_runtime::spawn_blocking(move || session_manager::delete_sessions(&items))
+    tokio::task::spawn_blocking(move || session_manager::delete_sessions(&items))
         .await
         .map_err(|e| format!("Failed to delete sessions: {e}"))
 }

@@ -1,6 +1,6 @@
 mod app_config;
 mod app_store;
-mod auto_launch;
+// mod auto_launch; // REMOVED - Tauri-specific, server mode
 mod claude_desktop_config;
 mod claude_mcp;
 mod claude_plugin;
@@ -12,11 +12,15 @@ mod deeplink;
 mod error;
 mod gemini_config;
 mod gemini_mcp;
+mod handlers;
 pub mod hermes_config;
+mod init;
 mod init_status;
+#[cfg(not(feature = "server_only"))]
 mod lightweight;
-#[cfg(target_os = "linux")]
-mod linux_fix;
+pub mod main_server;
+// #[cfg(target_os = "linux")]
+// mod linux_fix; // REMOVED - Tauri-specific, server mode
 mod mcp;
 mod openclaw_config;
 mod opencode_config;
@@ -31,7 +35,7 @@ mod session_manager;
 mod settings;
 mod store;
 
-mod tray;
+// mod tray; // REMOVED - Tauri-specific, server mode
 mod usage_script;
 
 pub use app_config::{AppType, InstalledSkill, McpApps, McpServer, MultiAppConfig, SkillApps};
@@ -56,17 +60,25 @@ pub use services::{
 };
 pub use settings::{update_settings, AppSettings};
 pub use store::AppState;
+#[cfg(not(feature = "server_only"))]
 use tauri_plugin_deep_link::DeepLinkExt;
+#[cfg(not(feature = "server_only"))]
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 use std::sync::Arc;
+#[cfg(not(feature = "server_only"))]
 #[cfg(target_os = "macos")]
 use tauri::image::Image;
+#[cfg(not(feature = "server_only"))]
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+#[cfg(not(feature = "server_only"))]
 use tauri::RunEvent;
+#[cfg(not(feature = "server_only"))]
 use tauri::{Emitter, Manager};
+#[cfg(not(feature = "server_only"))]
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
+#[cfg(not(feature = "server_only"))]
 fn redact_url_for_log(url_str: &str) -> String {
     match url::Url::parse(url_str) {
         Ok(url) => {
@@ -103,6 +115,7 @@ fn redact_url_for_log(url_str: &str) -> String {
 /// - 解析 URL
 /// - 向前端发射 `deeplink-import` / `deeplink-error` 事件
 /// - 可选：在成功时聚焦主窗口
+#[cfg(not(feature = "server_only"))]
 fn handle_deeplink_url(
     app: &tauri::AppHandle,
     url_str: &str,
@@ -164,6 +177,7 @@ fn handle_deeplink_url(
 }
 
 /// 更新托盘菜单的Tauri命令
+#[cfg(not(feature = "server_only"))]
 #[tauri::command]
 async fn update_tray_menu(
     app: tauri::AppHandle,
@@ -185,6 +199,7 @@ async fn update_tray_menu(
     }
 }
 
+#[cfg(not(feature = "server_only"))]
 #[cfg(target_os = "macos")]
 fn macos_tray_icon() -> Option<Image<'static>> {
     const ICON_BYTES: &[u8] = include_bytes!("../icons/tray/macos/statusbar_template_3x.png");
@@ -198,6 +213,7 @@ fn macos_tray_icon() -> Option<Image<'static>> {
     }
 }
 
+#[cfg(not(feature = "server_only"))]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 设置 panic hook，在应用崩溃时记录日志到 <app_config_dir>/crash.log（默认 ~/.cc-switch/crash.log）
@@ -1482,6 +1498,7 @@ pub fn run() {
 /// 在应用退出前检查代理服务器状态，如果正在运行则停止代理并恢复 Live 配置。
 /// 确保 Claude Code/Codex/Gemini 的配置不会处于损坏状态。
 /// 使用 stop_with_restore_keep_state 保留 settings 表中的代理状态，下次启动时自动恢复。
+#[cfg(not(feature = "server_only"))]
 pub async fn cleanup_before_exit(app_handle: &tauri::AppHandle) {
     if let Some(state) = app_handle.try_state::<store::AppState>() {
         let proxy_service = &state.proxy_service;
@@ -1654,6 +1671,7 @@ fn initialize_common_config_snippets(state: &store::AppState) {
 // ============================================================
 
 /// 检测是否为中文环境
+#[cfg(not(feature = "server_only"))]
 fn is_chinese_locale() -> bool {
     std::env::var("LANG")
         .or_else(|_| std::env::var("LC_ALL"))
@@ -1664,6 +1682,7 @@ fn is_chinese_locale() -> bool {
 
 /// 显示迁移错误对话框
 /// 返回 true 表示用户选择重试，false 表示用户选择退出
+#[cfg(not(feature = "server_only"))]
 fn show_migration_error_dialog(app: &tauri::AppHandle, error: &str) -> bool {
     let title = if is_chinese_locale() {
         "配置迁移失败"
@@ -1715,6 +1734,7 @@ fn show_migration_error_dialog(app: &tauri::AppHandle, error: &str) -> bool {
 
 /// 显示数据库初始化/Schema 迁移失败对话框
 /// 返回 true 表示用户选择重试，false 表示用户选择退出
+#[cfg(not(feature = "server_only"))]
 fn show_database_init_error_dialog(
     app: &tauri::AppHandle,
     db_path: &std::path::Path,
@@ -1782,16 +1802,25 @@ fn show_database_init_error_dialog(
 // 在应用主动退出前显式持久化窗口状态
 // ============================================================
 
+#[cfg(not(feature = "server_only"))]
 fn window_state_flags() -> StateFlags {
     StateFlags::POSITION | StateFlags::SIZE | StateFlags::MAXIMIZED
 }
 
-/// 当前应用的退出路径会拦截 `ExitRequested` 并最终直接 `std::process::exit(0)`，
-/// 这里需要在真正结束进程前手动落盘，避免 window-state 插件的默认退出钩子被绕过。
+#[cfg(not(feature = "server_only"))]
 pub fn save_window_state_before_exit(app_handle: &tauri::AppHandle) {
     if let Err(err) = app_handle.save_window_state(window_state_flags()) {
         log::error!("退出前保存窗口状态失败: {err}");
     } else {
         log::info!("已在退出前保存窗口状态");
     }
+}
+
+/// 启动独立 HTTP 服务器模式
+///
+/// 不依赖 Tauri 运行时，通过 HTTP API 提供服务。
+/// 调用 `main_server::start_server()` 启动 axum HTTP 服务。
+pub async fn run_server() {
+    println!("CC Switch Server starting...");
+    crate::main_server::start_server().await;
 }

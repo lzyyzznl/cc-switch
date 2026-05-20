@@ -1,5 +1,4 @@
 use indexmap::IndexMap;
-use tauri::{Emitter, State};
 
 use crate::app_config::AppType;
 use crate::commands::copilot::CopilotAuthState;
@@ -10,6 +9,7 @@ use crate::services::{
 };
 use crate::store::AppState;
 use std::str::FromStr;
+use std::sync::Arc;
 
 // 常量定义
 const TEMPLATE_TYPE_GITHUB_COPILOT: &str = "github_copilot";
@@ -18,65 +18,59 @@ const TEMPLATE_TYPE_BALANCE: &str = "balance";
 const COPILOT_UNIT_PREMIUM: &str = "requests";
 
 /// 获取所有供应商
-#[tauri::command]
 pub fn get_providers(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
 ) -> Result<IndexMap<String, Provider>, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::list(state.inner(), app_type).map_err(|e| e.to_string())
+    ProviderService::list(state.as_ref(), app_type).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub fn get_current_provider(state: State<'_, AppState>, app: String) -> Result<String, String> {
+pub fn get_current_provider(state: Arc<AppState>, app: String) -> Result<String, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::current(state.inner(), app_type).map_err(|e| e.to_string())
+    ProviderService::current(state.as_ref(), app_type).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn add_provider(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
     provider: Provider,
     #[allow(non_snake_case)] addToLive: Option<bool>,
 ) -> Result<bool, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::add(state.inner(), app_type, provider, addToLive.unwrap_or(true))
+    ProviderService::add(state.as_ref(), app_type, provider, addToLive.unwrap_or(true))
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn update_provider(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
     provider: Provider,
     #[allow(non_snake_case)] originalId: Option<String>,
 ) -> Result<bool, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::update(state.inner(), app_type, originalId.as_deref(), provider)
+    ProviderService::update(state.as_ref(), app_type, originalId.as_deref(), provider)
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn delete_provider(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
     id: String,
 ) -> Result<bool, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::delete(state.inner(), app_type, &id)
+    ProviderService::delete(state.as_ref(), app_type, &id)
         .map(|_| true)
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn remove_provider_from_live_config(
-    state: tauri::State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
     id: String,
 ) -> Result<bool, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::remove_from_live_config(state.inner(), app_type, &id)
+    ProviderService::remove_from_live_config(state.as_ref(), app_type, &id)
         .map(|_| true)
         .map_err(|e| e.to_string())
 }
@@ -98,9 +92,8 @@ pub fn switch_provider_test_hook(
     switch_provider_internal(state, app_type, id)
 }
 
-#[tauri::command]
 pub fn switch_provider(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
     id: String,
 ) -> Result<SwitchResult, String> {
@@ -144,30 +137,26 @@ pub fn import_default_config_test_hook(
     import_default_config_internal(state, app_type)
 }
 
-#[tauri::command]
-pub fn import_default_config(state: State<'_, AppState>, app: String) -> Result<bool, String> {
+pub fn import_default_config(state: Arc<AppState>, app: String) -> Result<bool, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
     import_default_config_internal(&state, app_type).map_err(Into::into)
 }
 
-#[tauri::command]
 pub async fn get_claude_desktop_status(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
 ) -> Result<crate::claude_desktop_config::ClaudeDesktopStatus, String> {
     let proxy_running = state.proxy_service.is_running().await;
     crate::claude_desktop_config::get_status(state.db.as_ref(), proxy_running)
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn get_claude_desktop_default_routes(
 ) -> Vec<crate::claude_desktop_config::ClaudeDesktopDefaultRoute> {
     crate::claude_desktop_config::default_proxy_routes()
 }
 
-#[tauri::command]
 pub fn import_claude_desktop_providers_from_claude(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
 ) -> Result<usize, String> {
     let claude_providers = state
         .db
@@ -359,11 +348,9 @@ pub(crate) fn suggested_claude_desktop_routes(
 }
 
 #[allow(non_snake_case)]
-#[tauri::command]
 pub async fn queryProviderUsage(
-    app_handle: tauri::AppHandle,
-    state: State<'_, AppState>,
-    copilot_state: State<'_, CopilotAuthState>,
+    state: Arc<AppState>,
+    copilot_state: Arc<CopilotAuthState>,
     #[allow(non_snake_case)] providerId: String, // 使用 camelCase 匹配前端
     app: String,
 ) -> Result<crate::provider::UsageResult, String> {
@@ -384,17 +371,7 @@ pub async fn queryProviderUsage(
             error: Some(err_msg.clone()),
         },
     };
-    let payload = serde_json::json!({
-        "kind": "script",
-        "appType": app_type.as_str(),
-        "providerId": &providerId,
-        "data": &snapshot,
-    });
-    if let Err(e) = app_handle.emit("usage-cache-updated", payload) {
-        log::error!("emit usage-cache-updated (script) 失败: {e}");
-    }
     state.usage_cache.put_script(app_type, providerId, snapshot);
-    crate::tray::schedule_tray_refresh(&app_handle);
     inner
 }
 
@@ -545,9 +522,8 @@ async fn query_provider_usage_inner(
 
 #[allow(non_snake_case)]
 #[allow(clippy::too_many_arguments)]
-#[tauri::command]
 pub async fn testUsageScript(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     #[allow(non_snake_case)] providerId: String,
     app: String,
     #[allow(non_snake_case)] scriptCode: String,
@@ -560,7 +536,7 @@ pub async fn testUsageScript(
 ) -> Result<crate::provider::UsageResult, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
     ProviderService::test_usage_script(
-        state.inner(),
+        state.as_ref(),
         app_type,
         &providerId,
         &scriptCode,
@@ -575,13 +551,11 @@ pub async fn testUsageScript(
     .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn read_live_provider_settings(app: String) -> Result<serde_json::Value, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
     ProviderService::read_live_settings(app_type).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub async fn test_api_endpoints(
     urls: Vec<String>,
     #[allow(non_snake_case)] timeoutSecs: Option<u64>,
@@ -591,148 +565,109 @@ pub async fn test_api_endpoints(
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn get_custom_endpoints(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
     #[allow(non_snake_case)] providerId: String,
 ) -> Result<Vec<crate::settings::CustomEndpoint>, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::get_custom_endpoints(state.inner(), app_type, &providerId)
+    ProviderService::get_custom_endpoints(state.as_ref(), app_type, &providerId)
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn add_custom_endpoint(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
     #[allow(non_snake_case)] providerId: String,
     url: String,
 ) -> Result<(), String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::add_custom_endpoint(state.inner(), app_type, &providerId, url)
+    ProviderService::add_custom_endpoint(state.as_ref(), app_type, &providerId, url)
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn remove_custom_endpoint(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
     #[allow(non_snake_case)] providerId: String,
     url: String,
 ) -> Result<(), String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::remove_custom_endpoint(state.inner(), app_type, &providerId, url)
+    ProviderService::remove_custom_endpoint(state.as_ref(), app_type, &providerId, url)
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn update_endpoint_last_used(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
     #[allow(non_snake_case)] providerId: String,
     url: String,
 ) -> Result<(), String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::update_endpoint_last_used(state.inner(), app_type, &providerId, url)
+    ProviderService::update_endpoint_last_used(state.as_ref(), app_type, &providerId, url)
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn update_providers_sort_order(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     app: String,
     updates: Vec<ProviderSortUpdate>,
 ) -> Result<bool, String> {
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
-    ProviderService::update_sort_order(state.inner(), app_type, updates).map_err(|e| e.to_string())
+    ProviderService::update_sort_order(state.as_ref(), app_type, updates).map_err(|e| e.to_string())
 }
 
 use crate::provider::UniversalProvider;
 use std::collections::HashMap;
-use tauri::AppHandle;
 
-#[derive(Clone, serde::Serialize)]
-pub struct UniversalProviderSyncedEvent {
-    pub action: String,
-    pub id: String,
-}
-
-fn emit_universal_provider_synced(app: &AppHandle, action: &str, id: &str) {
-    let _ = app.emit(
-        "universal-provider-synced",
-        UniversalProviderSyncedEvent {
-            action: action.to_string(),
-            id: id.to_string(),
-        },
-    );
-}
-
-#[tauri::command]
 pub fn get_universal_providers(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
 ) -> Result<HashMap<String, UniversalProvider>, String> {
-    ProviderService::list_universal(state.inner()).map_err(|e| e.to_string())
+    ProviderService::list_universal(state.as_ref()).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn get_universal_provider(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     id: String,
 ) -> Result<Option<UniversalProvider>, String> {
-    ProviderService::get_universal(state.inner(), &id).map_err(|e| e.to_string())
+    ProviderService::get_universal(state.as_ref(), &id).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn upsert_universal_provider(
-    app: AppHandle,
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     provider: UniversalProvider,
 ) -> Result<bool, String> {
-    let id = provider.id.clone();
     let result =
-        ProviderService::upsert_universal(state.inner(), provider).map_err(|e| e.to_string())?;
-
-    emit_universal_provider_synced(&app, "upsert", &id);
+        ProviderService::upsert_universal(state.as_ref(), provider).map_err(|e| e.to_string())?;
 
     Ok(result)
 }
 
-#[tauri::command]
 pub fn delete_universal_provider(
-    app: AppHandle,
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     id: String,
 ) -> Result<bool, String> {
     let result =
-        ProviderService::delete_universal(state.inner(), &id).map_err(|e| e.to_string())?;
-
-    emit_universal_provider_synced(&app, "delete", &id);
+        ProviderService::delete_universal(state.as_ref(), &id).map_err(|e| e.to_string())?;
 
     Ok(result)
 }
 
-#[tauri::command]
 pub fn sync_universal_provider(
-    app: AppHandle,
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     id: String,
 ) -> Result<bool, String> {
     let result =
-        ProviderService::sync_universal_to_apps(state.inner(), &id).map_err(|e| e.to_string())?;
-
-    emit_universal_provider_synced(&app, "sync", &id);
+        ProviderService::sync_universal_to_apps(state.as_ref(), &id).map_err(|e| e.to_string())?;
 
     Ok(result)
 }
 
-#[tauri::command]
-pub fn import_opencode_providers_from_live(state: State<'_, AppState>) -> Result<usize, String> {
-    crate::services::provider::import_opencode_providers_from_live(state.inner())
+pub fn import_opencode_providers_from_live(state: Arc<AppState>) -> Result<usize, String> {
+    crate::services::provider::import_opencode_providers_from_live(state.as_ref())
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn get_opencode_live_provider_ids() -> Result<Vec<String>, String> {
     crate::opencode_config::get_providers()
         .map(|providers| providers.keys().cloned().collect())

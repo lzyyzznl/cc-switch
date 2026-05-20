@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use tauri::{Emitter, State};
+use std::sync::Arc;
 
 use crate::app_config::AppType;
 use crate::services::subscription::{CredentialStatus, SubscriptionQuota};
@@ -13,10 +13,8 @@ use crate::store::AppState;
 /// 最新数据。失败快照写入后 `format_subscription_summary` 会通过 `success=false`
 /// 守卫返回 `None`，托盘 suffix 自然消失，避免长期滞留旧配额数字。
 /// Err 原样向前端返回，React Query 的 onError 不会被吞掉。
-#[tauri::command]
 pub async fn get_subscription_quota(
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     tool: String,
 ) -> Result<SubscriptionQuota, String> {
     let inner = crate::services::subscription::get_subscription_quota(&tool).await;
@@ -26,16 +24,7 @@ pub async fn get_subscription_quota(
         Err(err_msg) => SubscriptionQuota::error(&tool, CredentialStatus::Valid, err_msg.clone()),
     };
     if let Ok(app_type) = AppType::from_str(&tool) {
-        let payload = serde_json::json!({
-            "kind": "subscription",
-            "appType": app_type.as_str(),
-            "data": &snapshot,
-        });
-        if let Err(e) = app.emit("usage-cache-updated", payload) {
-            log::error!("emit usage-cache-updated (subscription) 失败: {e}");
-        }
         state.usage_cache.put_subscription(app_type, snapshot);
-        crate::tray::schedule_tray_refresh(&app);
     }
     inner
 }

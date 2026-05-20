@@ -1,4 +1,5 @@
-use tauri::State;
+
+use std::sync::Arc;
 
 use crate::commands::codex_oauth::CodexOAuthState;
 use crate::commands::copilot::CopilotAuthState;
@@ -78,12 +79,11 @@ fn map_device_code_response(
     }
 }
 
-#[tauri::command(rename_all = "camelCase")]
 pub async fn auth_start_login(
     auth_provider: String,
     github_domain: Option<String>,
-    copilot_state: State<'_, CopilotAuthState>,
-    codex_state: State<'_, CodexOAuthState>,
+    copilot_state: Arc<CopilotAuthState>,
+    codex_state: Arc<CodexOAuthState>,
 ) -> Result<ManagedAuthDeviceCodeResponse, String> {
     let auth_provider = ensure_auth_provider(&auth_provider)?;
     match auth_provider {
@@ -107,13 +107,12 @@ pub async fn auth_start_login(
     }
 }
 
-#[tauri::command(rename_all = "camelCase")]
 pub async fn auth_poll_for_account(
     auth_provider: String,
     device_code: String,
     github_domain: Option<String>,
-    copilot_state: State<'_, CopilotAuthState>,
-    codex_state: State<'_, CodexOAuthState>,
+    copilot_state: Arc<CopilotAuthState>,
+    codex_state: Arc<CodexOAuthState>,
 ) -> Result<Option<ManagedAuthAccount>, String> {
     let auth_provider = ensure_auth_provider(&auth_provider)?;
     match auth_provider {
@@ -150,11 +149,10 @@ pub async fn auth_poll_for_account(
     }
 }
 
-#[tauri::command(rename_all = "camelCase")]
 pub async fn auth_list_accounts(
     auth_provider: String,
-    copilot_state: State<'_, CopilotAuthState>,
-    codex_state: State<'_, CodexOAuthState>,
+    copilot_state: Arc<CopilotAuthState>,
+    codex_state: Arc<CodexOAuthState>,
 ) -> Result<Vec<ManagedAuthAccount>, String> {
     let auth_provider = ensure_auth_provider(&auth_provider)?;
     match auth_provider {
@@ -182,11 +180,10 @@ pub async fn auth_list_accounts(
     }
 }
 
-#[tauri::command(rename_all = "camelCase")]
 pub async fn auth_get_status(
     auth_provider: String,
-    copilot_state: State<'_, CopilotAuthState>,
-    codex_state: State<'_, CodexOAuthState>,
+    copilot_state: Arc<CopilotAuthState>,
+    codex_state: Arc<CodexOAuthState>,
 ) -> Result<ManagedAuthStatus, String> {
     let auth_provider = ensure_auth_provider(&auth_provider)?;
     match auth_provider {
@@ -230,12 +227,11 @@ pub async fn auth_get_status(
     }
 }
 
-#[tauri::command(rename_all = "camelCase")]
 pub async fn auth_remove_account(
     auth_provider: String,
     account_id: String,
-    copilot_state: State<'_, CopilotAuthState>,
-    codex_state: State<'_, CodexOAuthState>,
+    copilot_state: Arc<CopilotAuthState>,
+    codex_state: Arc<CodexOAuthState>,
 ) -> Result<(), String> {
     let auth_provider = ensure_auth_provider(&auth_provider)?;
     match auth_provider {
@@ -257,12 +253,11 @@ pub async fn auth_remove_account(
     }
 }
 
-#[tauri::command(rename_all = "camelCase")]
 pub async fn auth_set_default_account(
     auth_provider: String,
     account_id: String,
-    copilot_state: State<'_, CopilotAuthState>,
-    codex_state: State<'_, CodexOAuthState>,
+    copilot_state: Arc<CopilotAuthState>,
+    codex_state: Arc<CodexOAuthState>,
 ) -> Result<(), String> {
     let auth_provider = ensure_auth_provider(&auth_provider)?;
     match auth_provider {
@@ -284,11 +279,10 @@ pub async fn auth_set_default_account(
     }
 }
 
-#[tauri::command(rename_all = "camelCase")]
 pub async fn auth_logout(
     auth_provider: String,
-    copilot_state: State<'_, CopilotAuthState>,
-    codex_state: State<'_, CodexOAuthState>,
+    copilot_state: Arc<CopilotAuthState>,
+    codex_state: Arc<CodexOAuthState>,
 ) -> Result<(), String> {
     let auth_provider = ensure_auth_provider(&auth_provider)?;
     match auth_provider {

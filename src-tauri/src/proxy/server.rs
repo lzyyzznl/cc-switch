@@ -39,7 +39,10 @@ pub struct ProxyState {
     /// Gemini Native shadow state，用于 thoughtSignature / tool call 回放
     pub gemini_shadow: Arc<GeminiShadowStore>,
     /// AppHandle，用于发射事件和更新托盘菜单
+    #[cfg(not(feature = "server_only"))]
     pub app_handle: Option<tauri::AppHandle>,
+    #[cfg(feature = "server_only")]
+    pub app_handle: Option<()>,
     /// 故障转移切换管理器
     pub failover_manager: Arc<FailoverSwitchManager>,
 }
@@ -57,7 +60,8 @@ impl ProxyServer {
     pub fn new(
         config: ProxyConfig,
         db: Arc<Database>,
-        app_handle: Option<tauri::AppHandle>,
+        #[cfg(not(feature = "server_only"))] app_handle: Option<tauri::AppHandle>,
+        #[cfg(feature = "server_only")] app_handle: Option<()>,
     ) -> Self {
         // 创建共享的 ProviderRouter（熔断器状态将跨所有请求保持）
         let provider_router = Arc::new(ProviderRouter::new(db.clone()));

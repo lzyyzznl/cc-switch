@@ -1,12 +1,12 @@
+use std::sync::Arc;
+
 use crate::deeplink::{
     import_mcp_from_deeplink, import_prompt_from_deeplink, import_provider_from_deeplink,
     import_skill_from_deeplink, parse_deeplink_url, DeepLinkImportRequest,
 };
 use crate::store::AppState;
-use tauri::State;
 
 /// Parse a deep link URL and return the parsed request for frontend confirmation
-#[tauri::command]
 pub fn parse_deeplink(url: String) -> Result<DeepLinkImportRequest, String> {
     log::info!("Parsing deep link URL: {url}");
     parse_deeplink_url(&url).map_err(|e| e.to_string())
@@ -14,7 +14,6 @@ pub fn parse_deeplink(url: String) -> Result<DeepLinkImportRequest, String> {
 
 /// Merge configuration from Base64/URL into a deep link request
 /// This is used by the frontend to show the complete configuration in the confirmation dialog
-#[tauri::command]
 pub fn merge_deeplink_config(
     request: DeepLinkImportRequest,
 ) -> Result<DeepLinkImportRequest, String> {
@@ -23,9 +22,8 @@ pub fn merge_deeplink_config(
 }
 
 /// Import a provider from a deep link request (legacy, kept for compatibility)
-#[tauri::command]
 pub fn import_from_deeplink(
-    state: State<AppState>,
+    state: Arc<AppState>,
     request: DeepLinkImportRequest,
 ) -> Result<String, String> {
     log::info!(
@@ -42,9 +40,8 @@ pub fn import_from_deeplink(
 }
 
 /// Import resource from a deep link request (unified handler)
-#[tauri::command]
 pub async fn import_from_deeplink_unified(
-    state: State<'_, AppState>,
+    state: Arc<AppState>,
     request: DeepLinkImportRequest,
 ) -> Result<serde_json::Value, String> {
     log::info!("Importing {} resource from deep link", request.resource);
