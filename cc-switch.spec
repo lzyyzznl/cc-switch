@@ -1,6 +1,3 @@
-%define _rpmdir %{_topdir}
-%define _srcrpmdir %{_topdir}
-
 Name:       cc-switch
 Version:    3.15.0
 Release:    1%{?dist}

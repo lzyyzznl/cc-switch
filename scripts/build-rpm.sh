@@ -13,7 +13,7 @@ echo "=== CC Switch RPM Builder ==="
 
 # 1. 构建后端
 echo "[1/4] Building cc-switch-server binary..."
-cd "${PROJECT_ROOT}"
+cd "${PROJECT_ROOT}/src-tauri"
 cargo build --release --features server_only
 BINARY="${PROJECT_ROOT}/src-tauri/target/release/cc-switch-server"
 
@@ -46,7 +46,7 @@ cp "${PROJECT_ROOT}/cc-switch.spec" "${RPM_TOPDIR}/SPECS/"
 # 构建 RPM
 rpmbuild --define "_topdir ${RPM_TOPDIR}" -bb "${RPM_TOPDIR}/SPECS/cc-switch.spec"
 
-# 提取结果
+# 提取结果（spec 中的 _rpmdir 默认指向 %_topdir/RPMS）
 cp "${RPM_TOPDIR}/RPMS/x86_64/"*.rpm "${PROJECT_ROOT}/"
 echo "=== RPM built successfully ==="
 ls -lh "${PROJECT_ROOT}/cc-switch-"*.rpm
