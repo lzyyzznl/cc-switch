@@ -98,6 +98,7 @@ pub struct RequestForwarder {
     /// AppHandle，用于发射事件和更新托盘
     #[cfg(not(feature = "server_only"))]
     app_handle: Option<tauri::AppHandle>,
+    // [Custom] server_only 模式: 无 Tauri AppHandle，使用 () 占位
     #[cfg(feature = "server_only")]
     app_handle: Option<()>,
     /// 请求开始时的"当前供应商 ID"（用于判断是否需要同步 UI/托盘）

@@ -356,6 +356,7 @@ impl tokio::io::AsyncWrite for ProxyStream {
     }
 }
 
+// [Custom] 二次开发: 系统代理回退逻辑（从环境变量读取 http_proxy/https_proxy）
 /// 从环境变量获取系统代理 URL（raw TCP/TLS 路径的回退）
 ///
 /// 检查顺序：https_proxy → http_proxy → all_proxy（先小写后大写），
@@ -379,6 +380,7 @@ fn get_system_proxy(scheme: &str, host: &str) -> Option<String> {
         .map(|v| v.trim().to_string())
 }
 
+// [Custom] 二次开发: no_proxy 环境变量解析（支持 CIDR 和通配符）
 /// 检查目标主机是否在 `no_proxy` 列表中
 ///
 /// 支持格式：
@@ -413,6 +415,7 @@ fn host_in_no_proxy(host: &str) -> bool {
         })
 }
 
+// [Custom] 二次开发: CIDR 网段匹配（仅 IPv4）
 /// 简单 CIDR 匹配（仅 IPv4，IPv6 需要 uuid crate 的 u128 支持）
 fn host_matches_cidr(host: &str, cidr: &str) -> bool {
     let (ip_str, prefix_str) = match cidr.split_once('/') {

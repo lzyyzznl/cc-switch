@@ -1,3 +1,4 @@
+// [Custom] 二次开发: HTTP API 路由处理器（server_only 模式）
 //! HTTP 命令调度
 //!
 //! 将 POST /api/{command} 请求分派到对应的 commands::* 函数。

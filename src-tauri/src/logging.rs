@@ -1,3 +1,4 @@
+// [Custom] 二次开发: 独立日志模块（server_only 模式使用）
 //! 独立日志模块（server_only 模式使用）
 //!
 //! 替代 Tauri 模式下的 `tauri_plugin_log`，同时输出到 stdout 和文件。

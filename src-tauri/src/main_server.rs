@@ -1,3 +1,4 @@
+// [Custom] 二次开发: 独立 HTTP 服务端入口（server_only 模式）
 //! HTTP 服务入口（独立服务器模式）
 //!
 //! 提供独立的 axum HTTP 服务器，替代 Tauri 桌面端。

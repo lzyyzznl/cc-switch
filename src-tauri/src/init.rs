@@ -1,3 +1,4 @@
+// [Custom] 二次开发: 公共初始化逻辑（不依赖 Tauri AppHandle）
 //! 公共初始化逻辑（不依赖 Tauri AppHandle）
 //!
 //! 此模块从 `lib.rs` 的 `setup()` 闭包中提取了所有不依赖 `tauri::AppHandle` 的

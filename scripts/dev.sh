@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# [Custom] 二次开发: 开发环境启动脚本
 set -e
 
 BACKEND_PORT="${CC_SWITCH_PORT:-10245}"

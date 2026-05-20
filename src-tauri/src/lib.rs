@@ -12,13 +12,17 @@ mod deeplink;
 mod error;
 mod gemini_config;
 mod gemini_mcp;
+// [Custom] server_only 模式: HTTP 路由处理器
 mod handlers;
 pub mod hermes_config;
+// [Custom] server_only 模式: 公共初始化逻辑
 mod init;
 mod init_status;
 #[cfg(not(feature = "server_only"))]
 mod lightweight;
+// [Custom] server_only 模式: 独立日志模块
 pub mod logging;
+// [Custom] server_only 模式: 独立 HTTP 服务端
 pub mod main_server;
 // #[cfg(target_os = "linux")]
 // mod linux_fix; // REMOVED - Tauri-specific, server mode

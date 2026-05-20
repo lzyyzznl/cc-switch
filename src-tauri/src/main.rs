@@ -22,6 +22,7 @@ fn main() {
     cc_switch_lib::run();
 }
 
+// [Custom] server_only 模式: 空的 main 入口（实际入口在 cc-switch-server 二进制）
 #[cfg(feature = "server_only")]
 fn main() {
     // main.rs is not used in server-only mode (cc-switch-server binary is used instead).

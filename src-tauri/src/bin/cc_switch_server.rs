@@ -1,3 +1,4 @@
+// [Custom] 二次开发: server_only 模式二进制入口
 //! CC Switch Standalone Server — Binary Entry Point
 //!
 //! When compiled with `--features server_only`, this binary starts

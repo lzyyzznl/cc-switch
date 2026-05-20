@@ -59,6 +59,7 @@ pub struct ProxyService {
     /// AppHandle，用于传递给 ProxyServer 以支持故障转移时的 UI 更新
     #[cfg(not(feature = "server_only"))]
     app_handle: Arc<RwLock<Option<tauri::AppHandle>>>,
+    // [Custom] server_only 模式: 无 Tauri AppHandle，使用 () 占位
     #[cfg(feature = "server_only")]
     app_handle: Arc<RwLock<Option<()>>>,
     switch_locks: SwitchLockManager,
