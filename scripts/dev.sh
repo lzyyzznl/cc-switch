@@ -8,10 +8,10 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 kill_port() {
     local port=$1
-    local pid
-    pid=$(lsof -ti tcp:"$port" 2>/dev/null) || return 0
-    echo "  → 杀死进程 PID $pid（占用端口 $port）"
-    kill -9 "$pid" 2>/dev/null || true
+    local pids
+    pids=$(lsof -ti tcp:"$port" 2>/dev/null) || return 0
+    echo "  → 杀死进程 PID $(echo "$pids" | tr '\n' ' ')（占用端口 $port）"
+    echo "$pids" | xargs -r kill -9 2>/dev/null || true
     sleep 1
 }
 

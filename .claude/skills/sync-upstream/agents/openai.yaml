@@ -1,0 +1,4 @@
+# [Custom] 二次开发文件
+display_name: Sync Upstream
+short_description: 同步上游代码并保留二开变更
+default_prompt: 同步 farion1231/cc-switch 上游代码

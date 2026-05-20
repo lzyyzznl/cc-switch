@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  Download,
-  Copy,
   ExternalLink,
   Github,
   Globe,
@@ -12,6 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+// [Custom] 移除上游 Download/Copy 导入（更新下载/一键安装）
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -25,7 +24,6 @@ import { toast } from "sonner";
 import { getVersion } from "@tauri-apps/api/app";
 import { settingsApi } from "@/lib/api";
 import { useUpdate } from "@/contexts/UpdateContext";
-import { relaunchApp } from "@/lib/updater";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import appIcon from "@/assets/icons/app-icon.png";
@@ -82,32 +80,16 @@ const ENV_BADGE_CONFIG: Record<
   },
 };
 
-const ONE_CLICK_INSTALL_COMMANDS = `# Claude Code (Native install - recommended)
-curl -fsSL https://claude.ai/install.sh | bash
-# Codex
-npm i -g @openai/codex@latest
-# Gemini CLI
-npm i -g @google/gemini-cli@latest
-# OpenCode
-curl -fsSL https://opencode.ai/install | bash`;
-
 export function AboutSection({ isPortable }: AboutSectionProps) {
   // ... (use hooks as before) ...
   const { t } = useTranslation();
   const [version, setVersion] = useState<string | null>(null);
   const [isLoadingVersion, setIsLoadingVersion] = useState(true);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [toolVersions, setToolVersions] = useState<ToolVersion[]>([]);
   const [isLoadingTools, setIsLoadingTools] = useState(true);
 
-  const {
-    hasUpdate,
-    updateInfo,
-    updateHandle,
-    checkUpdate,
-    resetDismiss,
-    isChecking,
-  } = useUpdate();
+  // [Custom] 简化：移除上游 handleCheckUpdate/更新下载按钮/一键安装区域
+  const { hasUpdate, updateInfo } = useUpdate();
 
   const [wslShellByTool, setWslShellByTool] = useState<
     Record<string, WslShellPreference>
@@ -230,7 +212,7 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ... (handlers like handleOpenReleaseNotes, handleCheckUpdate) ...
+  // ... (handlers like handleOpenReleaseNotes) ...
 
   const handleOpenReleaseNotes = useCallback(async () => {
     try {
@@ -256,60 +238,6 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
       toast.error(t("settings.openReleaseNotesFailed"));
     }
   }, [t, updateInfo?.availableVersion, version]);
-
-  const handleCheckUpdate = useCallback(async () => {
-    if (hasUpdate && updateHandle) {
-      if (isPortable) {
-        try {
-          await settingsApi.checkUpdates();
-        } catch (error) {
-          console.error("[AboutSection] Portable update failed", error);
-        }
-        return;
-      }
-
-      setIsDownloading(true);
-      try {
-        resetDismiss();
-        await updateHandle.downloadAndInstall();
-        await relaunchApp();
-      } catch (error) {
-        console.error("[AboutSection] Update failed", error);
-        toast.error(t("settings.updateFailed"));
-        try {
-          await settingsApi.checkUpdates();
-        } catch (fallbackError) {
-          console.error(
-            "[AboutSection] Failed to open fallback updater",
-            fallbackError,
-          );
-        }
-      } finally {
-        setIsDownloading(false);
-      }
-      return;
-    }
-
-    try {
-      const available = await checkUpdate();
-      if (!available) {
-        toast.success(t("settings.upToDate"), { closeButton: true });
-      }
-    } catch (error) {
-      console.error("[AboutSection] Check update failed", error);
-      toast.error(t("settings.checkUpdateFailed"));
-    }
-  }, [checkUpdate, hasUpdate, isPortable, resetDismiss, t, updateHandle]);
-
-  const handleCopyInstallCommands = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(ONE_CLICK_INSTALL_COMMANDS);
-      toast.success(t("settings.installCommandsCopied"), { closeButton: true });
-    } catch (error) {
-      console.error("[AboutSection] Failed to copy install commands", error);
-      toast.error(t("settings.installCommandsCopyFailed"));
-    }
-  }, [t]);
 
   const displayVersion = version ?? t("common.unknown");
 
@@ -395,37 +323,6 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
             >
               <ExternalLink className="h-3.5 w-3.5" />
               {t("settings.releaseNotes")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleCheckUpdate}
-              disabled={isChecking || isDownloading}
-              className="h-8 gap-1.5 text-xs"
-            >
-              {isDownloading ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {t("settings.updating")}
-                </>
-              ) : hasUpdate ? (
-                <>
-                  <Download className="h-3.5 w-3.5" />
-                  {t("settings.updateTo", {
-                    version: updateInfo?.availableVersion ?? "",
-                  })}
-                </>
-              ) : isChecking ? (
-                <>
-                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                  {t("settings.checking")}
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  {t("settings.checkForUpdates")}
-                </>
-              )}
             </Button>
           </div>
         </div>
@@ -584,38 +481,6 @@ export function AboutSection({ isPortable }: AboutSectionProps) {
             })}
           </div>
         </div>
-      )}
-
-      {!isWindows() && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.3 }}
-          className="space-y-3"
-        >
-          <h3 className="text-sm font-medium px-1">
-            {t("settings.oneClickInstall")}
-          </h3>
-          <div className="rounded-xl border border-border bg-gradient-to-br from-card/80 to-card/40 p-4 space-y-3 shadow-sm">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-muted-foreground">
-                {t("settings.oneClickInstallHint")}
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCopyInstallCommands}
-                className="h-7 gap-1.5 text-xs"
-              >
-                <Copy className="h-3.5 w-3.5" />
-                {t("common.copy")}
-              </Button>
-            </div>
-            <pre className="text-xs font-mono bg-background/80 px-3 py-2.5 rounded-lg border border-border/60 overflow-x-auto">
-              {ONE_CLICK_INSTALL_COMMANDS}
-            </pre>
-          </div>
-        </motion.div>
       )}
     </motion.section>
   );

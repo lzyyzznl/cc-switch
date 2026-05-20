@@ -1,0 +1,4 @@
+# [Custom] 二次开发文件
+display_name: Git Push
+short_description: 合规检查标注后推送代码
+default_prompt: 检查代码标注合规性并推送

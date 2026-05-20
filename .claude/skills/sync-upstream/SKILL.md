@@ -1,7 +1,11 @@
-# `/sync-upstream` — 同步上游代码
+---
+name: sync-upstream
+description: 同步 farion1231/cc-switch 上游最新代码到当前 main 分支，保留 [Custom] 二次开发代码，安全合入上游 fix/feat，自动标注 [Upstream]/[Merge] 标记。当用户要求同步上游代码、合并 upstream、或需要从源仓库拉取最新变更时使用。
+---
 
-同步 `farion1231/cc-switch` 的最新代码到当前 `main` 分支。
-保留二次开发（`[Custom]`）代码，安全合入上游 fix/feat。
+# sync-upstream — 同步上游代码
+
+同步 `farion1231/cc-switch` 的最新代码到当前 `main` 分支。保留二次开发（`[Custom]`）代码，安全合入上游 fix/feat。
 
 ## 流程
 
@@ -62,29 +66,29 @@
 
 1. 创建合并提交：
 
-```bash
-git commit -m "$(cat <<'EOF'
-chore: sync upstream to $(date +%Y-%m-%d)
+   ```bash
+   git commit -m "$(cat <<'EOF'
+   chore: sync upstream to $(date +%Y-%m-%d)
 
-合并 upstream/main 到 main，包含:
-$(bash scripts/sync-upstream.sh --fetch 2>&1 | tail -20)
+   合并 upstream/main 到 main，包含:
+   $(bash scripts/sync-upstream.sh --fetch 2>&1 | tail -20)
 
-[Sync] 同步上游代码
-EOF
-)"
-```
+   [Sync] 同步上游代码
+   EOF
+   )"
+   ```
 
 2. 更新同步标签：
 
-```bash
-git tag -f last-upstream-sync upstream/main
-```
+   ```bash
+   git tag -f last-upstream-sync upstream/main
+   ```
 
 3. 询问是否推送：
 
-```bash
-git push origin main --tags
-```
+   ```bash
+   git push origin main --tags
+   ```
 
 4. 确认推送成功
 
