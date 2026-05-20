@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+LOCKFILE="/tmp/cc-switch.lock"
+PORT=10245
+URL="http://127.0.0.1:${PORT}"
+PIDFILE="/tmp/cc-switch.pid"
+BINARY="/opt/cc-switch/cc-switch-server"
+FRONTEND_DIR="/opt/cc-switch/frontend"
+
+# 唯一锁：防止重复启动
+exec 100>"${LOCKFILE}"
+flock -n 100 || {
+    # 已有实例，检查端口是否存活
+    if curl -sf "${URL}" >/dev/null 2>&1; then
+        exec xdg-open "${URL}"
+    else
+        notify-send "CC Switch" "已有实例但服务未响应，请稍后重试"
+    fi
+    exit 0
+}
+
+# 先杀旧进程
+if [[ -f "${PIDFILE}" ]] && kill -0 "$(cat "${PIDFILE}")" 2>/dev/null; then
+    kill "$(cat "${PIDFILE}")" 2>/dev/null || true
+    sleep 1
+fi
+
+# 清理旧端口
+fuser -k "${PORT}/tcp" 2>/dev/null || true
+
+# 右下角弹窗提示启动中
+notify-send "CC Switch" "正在启动服务…"
+
+# 设置环境变量，让 server 能找到前端文件
+export CC_SWITCH_DIST_DIR="${FRONTEND_DIR}"
+
+# 后台启动服务
+nohup "${BINARY}" >/tmp/cc-switch.log 2>&1 &
+echo $! > "${PIDFILE}"
+
+# 等待服务就绪（最多等 15 秒）
+for i in $(seq 1 30); do
+    if curl -sf "${URL}" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.5
+done
+
+# 打开浏览器
+xdg-open "${URL}" || true
