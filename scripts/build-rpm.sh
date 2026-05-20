@@ -25,11 +25,18 @@ pnpm build:renderer
 # 3. 组装 RPM 目录结构
 echo "[3/4] Assembling package directory..."
 mkdir -p "${PKG_PATH}/frontend/assets"
+
+# 生成多尺寸高清图标
+ICON_SRC="${PROJECT_ROOT}/scripts/rpm-assets/cc-switch.png"
+convert "${ICON_SRC}" -resize 48x48  "${PKG_PATH}/cc-switch-48.png"
+convert "${ICON_SRC}" -resize 128x128 "${PKG_PATH}/cc-switch-128.png"
+convert "${ICON_SRC}" -resize 256x256 "${PKG_PATH}/cc-switch-256.png"
+cp "${ICON_SRC}" "${PKG_PATH}/cc-switch.png"
+
 cp "${BINARY}" "${PKG_PATH}/cc-switch-server"
 cp "${PROJECT_ROOT}/scripts/cc-switch" "${PKG_PATH}/"
 cp "${PROJECT_ROOT}/dist/index.html" "${PKG_PATH}/frontend/"
 cp "${PROJECT_ROOT}/dist/assets/"* "${PKG_PATH}/frontend/assets/"
-cp "${PROJECT_ROOT}/scripts/rpm-assets/cc-switch.png" "${PKG_PATH}/"
 cp "${PROJECT_ROOT}/scripts/cc-switch.desktop" "${PKG_PATH}/"
 echo "${VERSION}-${RELEASE}" > "${PKG_PATH}/VERSION"
 

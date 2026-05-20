@@ -21,7 +21,7 @@ launcher that starts the service and opens the browser.
 # 主程序目录
 mkdir -p %{buildroot}/opt/cc-switch/frontend/assets
 mkdir -p %{buildroot}/usr/share/applications
-mkdir -p %{buildroot}/usr/share/icons/hicolor/128x128/apps
+mkdir -p %{buildroot}/usr/share/icons/hicolor/{48x48,128x128,256x256,512x512}/apps
 
 # 安装二进制
 install -m 755 cc-switch-server %{buildroot}/opt/cc-switch/
@@ -36,9 +36,12 @@ install -m 644 frontend/assets/* %{buildroot}/opt/cc-switch/frontend/assets/
 # 安装版本文件
 echo "%{version}-%{release}" > %{buildroot}/opt/cc-switch/VERSION
 
-# 安装桌面文件和图标
+# 安装桌面文件和图标（多尺寸高清）
 install -m 644 cc-switch.desktop %{buildroot}/usr/share/applications/
-install -m 644 cc-switch.png %{buildroot}/usr/share/icons/hicolor/128x128/apps/
+install -m 644 cc-switch-48.png  %{buildroot}/usr/share/icons/hicolor/48x48/apps/cc-switch.png
+install -m 644 cc-switch-128.png %{buildroot}/usr/share/icons/hicolor/128x128/apps/cc-switch.png
+install -m 644 cc-switch-256.png %{buildroot}/usr/share/icons/hicolor/256x256/apps/cc-switch.png
+install -m 644 cc-switch.png     %{buildroot}/usr/share/icons/hicolor/512x512/apps/cc-switch.png
 
 %post
 # 安装/升级时：杀掉旧进程、清锁
@@ -52,14 +55,40 @@ rm -f /tmp/cc-switch.lock /tmp/cc-switch.pid
 gtk-update-icon-cache /usr/share/icons/hicolor 2>/dev/null || true
 update-desktop-database 2>/dev/null || true
 
+# 为每个已有用户创建桌面图标
+for home_dir in /home/*; do
+    [ -d "$home_dir" ] || continue
+    user=$(basename "$home_dir")
+    uid=$(id -u "$user" 2>/dev/null) || continue
+    # 遍历常见桌面目录名
+    for desktop_subdir in Desktop 桌面; do
+        desktop_path="$home_dir/$desktop_subdir"
+        if [ -d "$desktop_path" ]; then
+            cp /usr/share/applications/cc-switch.desktop "$desktop_path/"
+            chown "$uid" "$desktop_path/cc-switch.desktop"
+            chmod 755 "$desktop_path/cc-switch.desktop"
+        fi
+    done
+done
+
 %preun
 if [ "$1" -eq 0 ]; then
-    # 真正卸载（非升级）时清理进程
+    # 真正卸载（非升级）时清理
+    # 杀进程（PID 文件 + 进程名 + 端口全清理）
     if [ -f /tmp/cc-switch.pid ]; then
         kill "$(cat /tmp/cc-switch.pid)" 2>/dev/null || true
     fi
+    pkill -f cc-switch-server 2>/dev/null || true
     fuser -k 10245/tcp 2>/dev/null || true
+    sleep 1
     rm -f /tmp/cc-switch.lock /tmp/cc-switch.pid
+
+    # 删除所有用户的桌面图标
+    for home_dir in /home/*; do
+        [ -d "$home_dir" ] || continue
+        rm -f "$home_dir/Desktop/cc-switch.desktop"
+        rm -f "$home_dir/桌面/cc-switch.desktop"
+    done
 fi
 
 %files
@@ -71,7 +100,10 @@ fi
 /opt/cc-switch/frontend/assets/*
 /opt/cc-switch/VERSION
 /usr/share/applications/cc-switch.desktop
+/usr/share/icons/hicolor/48x48/apps/cc-switch.png
 /usr/share/icons/hicolor/128x128/apps/cc-switch.png
+/usr/share/icons/hicolor/256x256/apps/cc-switch.png
+/usr/share/icons/hicolor/512x512/apps/cc-switch.png
 
 %changelog
 * Wed May 20 2026 李泽宇 <lzy@zluck.com> - 3.15.0-1
