@@ -18,6 +18,7 @@ mod init;
 mod init_status;
 #[cfg(not(feature = "server_only"))]
 mod lightweight;
+pub mod logging;
 pub mod main_server;
 // #[cfg(target_os = "linux")]
 // mod linux_fix; // REMOVED - Tauri-specific, server mode

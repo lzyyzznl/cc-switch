@@ -10,6 +10,8 @@ use futures::{stream::Stream, StreamExt};
 use http_body_util::BodyExt;
 use hyper_rustls::HttpsConnectorBuilder;
 use hyper_util::{client::legacy::Client, rt::TokioExecutor};
+use std::net::IpAddr;
+use std::str::FromStr;
 use std::sync::OnceLock;
 
 /// Our own header case map: maps lowercase header name → original wire-casing bytes.
@@ -354,6 +356,97 @@ impl tokio::io::AsyncWrite for ProxyStream {
     }
 }
 
+/// 从环境变量获取系统代理 URL（raw TCP/TLS 路径的回退）
+///
+/// 检查顺序：https_proxy → http_proxy → all_proxy（先小写后大写），
+/// 并检查 `no_proxy` 决定目标主机是否应绕过代理。
+fn get_system_proxy(scheme: &str, host: &str) -> Option<String> {
+    // 跳过 no_proxy 中的主机
+    if host_in_no_proxy(host) {
+        return None;
+    }
+
+    let proxy_key = match scheme {
+        "https" => "https_proxy",
+        _ => "http_proxy",
+    };
+
+    std::env::var(proxy_key)
+        .or_else(|_| std::env::var(proxy_key.to_uppercase()))
+        .or_else(|_| std::env::var("all_proxy").or_else(|_| std::env::var("ALL_PROXY")))
+        .ok()
+        .filter(|v| !v.trim().is_empty())
+        .map(|v| v.trim().to_string())
+}
+
+/// 检查目标主机是否在 `no_proxy` 列表中
+///
+/// 支持格式：
+/// - 精确匹配：`example.com`
+/// - 通配符后缀：`.example.com` 匹配 `sub.example.com`
+/// - CIDR 网段：`10.0.0.0/8` 匹配 `10.x.x.x`（仅 IPv4）
+/// - 多个条目用逗号分隔
+fn host_in_no_proxy(host: &str) -> bool {
+    let no_proxy = std::env::var("no_proxy")
+        .or_else(|_| std::env::var("NO_PROXY"))
+        .unwrap_or_default();
+
+    if no_proxy.trim().is_empty() {
+        return false;
+    }
+
+    no_proxy
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .any(|entry| {
+            // CIDR 网段匹配（仅 IPv4）
+            if entry.contains('/') {
+                return host_matches_cidr(host, entry);
+            }
+            // 通配符：.example.com 匹配 sub.example.com
+            if entry.starts_with('.') {
+                return host.ends_with(entry) || host == &entry[1..];
+            }
+            // 精确匹配
+            host == entry
+        })
+}
+
+/// 简单 CIDR 匹配（仅 IPv4，IPv6 需要 uuid crate 的 u128 支持）
+fn host_matches_cidr(host: &str, cidr: &str) -> bool {
+    let (ip_str, prefix_str) = match cidr.split_once('/') {
+        Some((ip, prefix)) => (ip, prefix),
+        None => return false,
+    };
+
+    let prefix_len: u8 = match prefix_str.parse() {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+
+    let host_ip: IpAddr = match IpAddr::from_str(host) {
+        Ok(ip) => ip,
+        Err(_) => return false,
+    };
+
+    let cidr_ip: IpAddr = match IpAddr::from_str(ip_str) {
+        Ok(ip) => ip,
+        Err(_) => return false,
+    };
+
+    match (host_ip, cidr_ip) {
+        (IpAddr::V4(host), IpAddr::V4(cidr)) => {
+            if prefix_len >= 32 {
+                return host == cidr;
+            }
+            let mask = u32::MAX << (32 - prefix_len);
+            (u32::from(host) & mask) == (u32::from(cidr) & mask)
+        }
+        _ => false,
+    }
+}
+
 /// Send request via raw TCP/TLS with exact original header casing.
 ///
 /// When `proxy_url` is provided, establishes an HTTP CONNECT tunnel through
@@ -382,8 +475,12 @@ async fn send_raw_request(
     let raw = build_raw_request(method, path_and_query, headers, original_cases, body);
 
     // Establish TCP connection — either direct or through HTTP CONNECT proxy
-    let stream = if let Some(proxy) = proxy_url {
-        connect_via_proxy(proxy, host, port).await?
+    // 优先使用显式配置的代理，其次回退到系统环境变量中的代理
+    let proxy: Option<String> = proxy_url
+        .map(|s| s.to_string())
+        .or_else(|| get_system_proxy(scheme, host));
+    let stream = if let Some(p) = proxy.as_deref() {
+        connect_via_proxy(&p, host, port).await?
     } else {
         ProxyStream::Tcp(
             tokio::net::TcpStream::connect((host, port))

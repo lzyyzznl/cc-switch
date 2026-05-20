@@ -54,7 +54,13 @@ pub async fn initialize_services() -> Result<(Arc<AppState>, EventBus), AppError
     crate::panic_hook::setup_panic_hook();
 
     // ============================================================
-    // 3. 初始化 rustls 加密提供者
+    // 3. 初始化文件日志（stdout + ~/.cc-switch/logs/cc-switch.log）
+    // ============================================================
+    crate::logging::init(log_dir);
+    log::info!("日志系统已初始化");
+
+    // ============================================================
+    // 4. 初始化 rustls 加密提供者
     // ============================================================
     let _ = rustls::crypto::ring::default_provider().install_default();
 
