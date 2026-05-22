@@ -8,6 +8,7 @@
 //! `resolve_against_models` 用 `/models` live 列表做精确匹配，找不到时
 //! 按 family（haiku/sonnet/opus）+ 最高版本号 fallback。
 
+#[cfg(not(feature = "server_only"))]
 use super::copilot_auth::CopilotModel;
 use serde_json::Value;
 
@@ -110,6 +111,8 @@ fn dashes_to_dot_in_last_version(id: &str) -> Option<String> {
 ///
 /// 返回 `None` 表示无需变换或无可降级的 family 候选（保留原 ID 让上游决定，
 /// 让用户拿到明确的 `model_not_supported` 而非被静默替换）。
+// [Custom] server_only 条件编译
+#[cfg(not(feature = "server_only"))]
 pub fn resolve_against_models(client_id: &str, models: &[CopilotModel]) -> Option<String> {
     let normalized = normalize_to_copilot_id(client_id);
     let target = normalized.as_deref().unwrap_or(client_id);
@@ -126,6 +129,8 @@ pub fn resolve_against_models(client_id: &str, models: &[CopilotModel]) -> Optio
     }
 }
 
+// [Custom] server_only 条件编译
+#[cfg(not(feature = "server_only"))]
 fn detect_family(id: &str) -> Option<&'static str> {
     let lower = id.to_ascii_lowercase();
     if lower.contains("haiku") {
@@ -141,6 +146,8 @@ fn detect_family(id: &str) -> Option<&'static str> {
 
 /// 提取 family 后第一段 `MAJOR.MINOR` 版本号。
 /// 例：`claude-sonnet-4.6` → (4, 6)；`claude-sonnet-4.6-1m` → (4, 6)。
+// [Custom] server_only 条件编译
+#[cfg(not(feature = "server_only"))]
 fn extract_major_minor(id: &str) -> Option<(u32, u32)> {
     let lower = id.to_ascii_lowercase();
     let family = detect_family(&lower)?;
@@ -153,6 +160,7 @@ fn extract_major_minor(id: &str) -> Option<(u32, u32)> {
     Some((major, minor))
 }
 
+#[cfg(not(feature = "server_only"))]
 fn family_fallback(target: &str, models: &[CopilotModel]) -> Option<String> {
     let family = detect_family(target)?;
     let want_1m = target.ends_with("-1m");

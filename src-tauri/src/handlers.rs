@@ -16,7 +16,6 @@ use serde_json::Value;
 use crate::commands::copilot::CopilotAuthState;
 use crate::commands::codex_oauth::CodexOAuthState;
 use crate::commands::skill::SkillServiceState;
-use crate::error::AppError;
 use crate::store::AppState;
 
 // ============================================================================
@@ -104,21 +103,6 @@ fn opt_i64(args: &Option<Value>, key: &str) -> Option<i64> {
         .and_then(|v| v.as_i64())
 }
 
-/// 提取可选 u32
-fn opt_u32(args: &Option<Value>, key: &str) -> Option<u32> {
-    args.as_ref()
-        .and_then(|v| v.get(key))
-        .and_then(|v| v.as_u64())
-        .map(|v| v as u32)
-}
-
-/// 提取可选 u64
-fn opt_u64(args: &Option<Value>, key: &str) -> Option<u64> {
-    args.as_ref()
-        .and_then(|v| v.get(key))
-        .and_then(|v| v.as_u64())
-}
-
 /// 提取必填 u32
 fn req_u32(args: &Option<Value>, key: &str) -> Result<u32, String> {
     args.as_ref()
@@ -145,15 +129,14 @@ fn req_usize(args: &Option<Value>, key: &str) -> Result<usize, String> {
 fn json_ok<T: serde::Serialize>(result: Result<T, impl IntoResponse>) -> Response {
     match result {
         Ok(val) => Json(serde_json::to_value(val).unwrap_or_default()).into_response(),
-        Err(err) => err.into_response(),
-    }
-}
-
-/// 将 Result<(), E> 转为 HTTP 响应
-fn json_unit(result: Result<(), impl IntoResponse>) -> Response {
-    match result {
-        Ok(()) => Json(serde_json::json!({"success": true})).into_response(),
-        Err(err) => err.into_response(),
+        Err(err) => {
+            let resp = err.into_response();
+            if resp.status() == axum::http::StatusCode::OK {
+                (axum::http::StatusCode::INTERNAL_SERVER_ERROR, resp).into_response()
+            } else {
+                resp
+            }
+        },
     }
 }
 
@@ -875,39 +858,6 @@ async fn dispatch_inner(command: &str, state: Arc<AppState>, args: Option<Value>
         }
 
         // ====================================================================
-        // Universal Provider 命令
-        // ====================================================================
-        "get_universal_providers" => {
-            json_ok(crate::commands::get_universal_providers(state))
-        }
-        "get_universal_provider" => {
-            let id = req_str(&args, "id")?;
-            json_ok(crate::commands::get_universal_provider(state, id))
-        }
-        "upsert_universal_provider" => {
-            let provider = req(&args, "provider")?;
-            json_ok(crate::commands::upsert_universal_provider(state, provider))
-        }
-        "delete_universal_provider" => {
-            let id = req_str(&args, "id")?;
-            json_ok(crate::commands::delete_universal_provider(state, id))
-        }
-        "sync_universal_provider" => {
-            let id = req_str(&args, "id")?;
-            json_ok(crate::commands::sync_universal_provider(state, id))
-        }
-
-        // ====================================================================
-        // OpenCode 命令
-        // ====================================================================
-        "import_opencode_providers_from_live" => {
-            json_ok(crate::commands::import_opencode_providers_from_live(state))
-        }
-        "get_opencode_live_provider_ids" => {
-            json_ok(crate::commands::get_opencode_live_provider_ids())
-        }
-
-        // ====================================================================
         // OpenClaw 命令
         // ====================================================================
         "import_openclaw_providers_from_live" => {
@@ -1408,14 +1358,6 @@ async fn dispatch_inner(command: &str, state: Arc<AppState>, args: Option<Value>
         }
         "get_auto_launch_status" => {
             json_ok(crate::commands::get_auto_launch_status().await)
-        }
-
-        // ====================================================================
-        // Window 命令
-        // ====================================================================
-        "set_window_theme" => {
-            let theme = req_str(&args, "theme")?;
-            json_ok(crate::commands::set_window_theme(theme).await)
         }
 
         // ====================================================================

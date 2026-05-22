@@ -73,6 +73,8 @@ impl FailoverSwitchManager {
         result
     }
 
+    // [Custom] server_only 条件编译
+    #[allow(unused_variables)]
     async fn do_switch(
         &self,
         #[cfg(not(feature = "server_only"))] app_handle: Option<&tauri::AppHandle>,
@@ -98,7 +100,8 @@ impl FailoverSwitchManager {
 
         log::info!("[FO-001] 切换: {app_type} → {provider_name}");
 
-        let mut switched = false;
+        // [Custom] server_only 下 switched 始终为 false
+        let switched = false;
 
         #[cfg(not(feature = "server_only"))]
         if let Some(app) = app_handle {

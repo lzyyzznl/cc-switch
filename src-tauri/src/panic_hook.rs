@@ -14,6 +14,8 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 static APP_CONFIG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
+// [Custom] server_only 条件编译
+#[cfg(not(feature = "server_only"))]
 pub fn init_app_config_dir(dir: PathBuf) {
     let _ = APP_CONFIG_DIR.set(dir);
 }
@@ -39,6 +41,8 @@ fn get_crash_log_path() -> PathBuf {
 }
 
 /// 获取日志目录路径
+// [Custom] server_only 条件编译
+#[cfg(not(feature = "server_only"))]
 pub fn get_log_dir() -> PathBuf {
     get_app_config_dir().join("logs")
 }

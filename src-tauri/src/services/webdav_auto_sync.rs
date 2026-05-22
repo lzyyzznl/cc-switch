@@ -1,19 +1,29 @@
+// [Custom] server_only 条件编译适配
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use std::sync::OnceLock;
+#[cfg(not(feature = "server_only"))]
 use std::time::{Duration, Instant};
 
+#[cfg(not(feature = "server_only"))]
 use serde_json::json;
 #[cfg(not(feature = "server_only"))]
+use std::sync::Arc;
+#[cfg(not(feature = "server_only"))]
 use tauri::{AppHandle, Emitter};
-use tokio::sync::mpsc::error::TrySendError;
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::{Sender, error::TrySendError};
+#[cfg(not(feature = "server_only"))]
+use tokio::sync::mpsc::{channel, Receiver};
 
-use crate::error::AppError;
+#[cfg(not(feature = "server_only"))]
 use crate::services::webdav_sync as webdav_sync_service;
+#[cfg(not(feature = "server_only"))]
+use crate::error::AppError;
+#[cfg(not(feature = "server_only"))]
 use crate::settings::{self, WebDavSyncSettings};
 
+#[cfg(not(feature = "server_only"))]
 const AUTO_SYNC_DEBOUNCE_MS: u64 = 1000;
+#[cfg(not(feature = "server_only"))]
 pub(crate) const MAX_AUTO_SYNC_WAIT_MS: u64 = 10_000;
 
 static DB_CHANGE_TX: OnceLock<Sender<String>> = OnceLock::new();
@@ -63,6 +73,7 @@ pub(crate) fn enqueue_change_signal(tx: &Sender<String>, table: &str) -> bool {
     }
 }
 
+#[cfg(not(feature = "server_only"))]
 pub(crate) fn auto_sync_wait_duration(started_at: Instant, now: Instant) -> Option<Duration> {
     let max_wait = Duration::from_millis(MAX_AUTO_SYNC_WAIT_MS);
     let debounce = Duration::from_millis(AUTO_SYNC_DEBOUNCE_MS);
@@ -73,6 +84,7 @@ pub(crate) fn auto_sync_wait_duration(started_at: Instant, now: Instant) -> Opti
     Some(debounce.min(max_wait - elapsed))
 }
 
+#[cfg(not(feature = "server_only"))]
 fn should_run_auto_sync(settings: Option<&WebDavSyncSettings>) -> bool {
     let Some(sync) = settings else {
         return false;
@@ -80,6 +92,7 @@ fn should_run_auto_sync(settings: Option<&WebDavSyncSettings>) -> bool {
     sync.enabled && sync.auto_sync
 }
 
+#[cfg(not(feature = "server_only"))]
 fn persist_auto_sync_error(settings: &mut WebDavSyncSettings, error: &AppError) {
     settings.status.last_error = Some(error.to_string());
     settings.status.last_error_source = Some("auto".to_string());

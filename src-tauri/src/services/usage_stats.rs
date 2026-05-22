@@ -1454,6 +1454,8 @@ struct PricingInfo {
 
 impl Database {
     /// Recalculate stored zero-cost usage rows once pricing becomes available.
+    // [Custom] server_only 条件编译
+    #[cfg(not(feature = "server_only"))]
     pub(crate) fn backfill_missing_usage_costs(&self) -> Result<u64, AppError> {
         let conn = lock_conn!(self.conn);
         Self::backfill_missing_usage_costs_on_conn(&conn, None)

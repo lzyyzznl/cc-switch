@@ -723,6 +723,8 @@ pub fn set_skill_storage_location(location: SkillStorageLocation) -> Result<(), 
 // ===== 备份策略管理函数 =====
 
 /// Get the effective auto-backup interval in hours (default 24)
+// [Custom] server_only 条件编译
+#[cfg(not(feature = "server_only"))]
 pub fn effective_backup_interval_hours() -> u32 {
     settings_store()
         .read()

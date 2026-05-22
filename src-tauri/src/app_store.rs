@@ -1,12 +1,16 @@
+// [Custom] server_only 条件编译适配
+#[cfg(not(feature = "server_only"))]
 use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::{OnceLock, RwLock};
 #[cfg(not(feature = "server_only"))]
 use tauri_plugin_store::StoreExt;
 
+#[cfg(not(feature = "server_only"))]
 use crate::error::AppError;
 
 /// Store 中的键名
+#[cfg(not(feature = "server_only"))]
 const STORE_KEY_APP_CONFIG_DIR: &str = "app_config_dir_override";
 
 /// 缓存当前的 app_config_dir 覆盖路径，避免存储 AppHandle
@@ -16,6 +20,7 @@ fn override_cache() -> &'static RwLock<Option<PathBuf>> {
     APP_CONFIG_DIR_OVERRIDE.get_or_init(|| RwLock::new(None))
 }
 
+#[cfg(not(feature = "server_only"))]
 fn update_cached_override(value: Option<PathBuf>) {
     if let Ok(mut guard) = override_cache().write() {
         *guard = value;
@@ -110,6 +115,7 @@ pub fn set_app_config_dir_to_store(
 }
 
 /// 解析路径，支持 ~ 开头的相对路径
+#[cfg(not(feature = "server_only"))]
 fn resolve_path(raw: &str) -> PathBuf {
     if raw == "~" {
         if let Some(home) = dirs::home_dir() {

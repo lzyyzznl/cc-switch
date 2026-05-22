@@ -70,6 +70,7 @@ use tauri_plugin_deep_link::DeepLinkExt;
 #[cfg(not(feature = "server_only"))]
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
+#[cfg(not(feature = "server_only"))]
 use std::sync::Arc;
 #[cfg(not(feature = "server_only"))]
 #[cfg(target_os = "macos")]

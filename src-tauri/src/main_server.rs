@@ -26,7 +26,6 @@ use tokio::sync::broadcast;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 
-use crate::init::EventBus;
 use crate::store::AppState;
 
 /// 启动 HTTP 服务器
@@ -162,6 +161,7 @@ async fn sse_handler(
 /// `fn main` 是私有函数，不影响库的模块导出。当作为 `--bin cc-switch-server`
 /// 编译时，此函数作为入口点，但 `start_server()` 等函数的 `crate::` 路径
 /// 在二进制命名空间下不可用——属于过渡状态，后续任务会完善。
+#[allow(dead_code)]
 #[tokio::main]
 async fn main() {
     start_server().await;

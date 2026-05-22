@@ -11,7 +11,7 @@ use super::{
     log_codes::fwd as log_fwd,
     provider_router::ProviderRouter,
     providers::{
-        gemini_shadow::GeminiShadowStore, get_adapter, AuthInfo, AuthStrategy, ProviderAdapter,
+        gemini_shadow::GeminiShadowStore, get_adapter, AuthStrategy, ProviderAdapter,
         ProviderType,
     },
     thinking_budget_rectifier::{rectify_thinking_budget, should_rectify_thinking_budget},
@@ -21,9 +21,15 @@ use super::{
     types::{CopilotOptimizerConfig, OptimizerConfig, ProxyStatus, RectifierConfig},
     ProxyError,
 };
+	// [Custom] server_only 模式: 无需 OAuth 状态管理
+#[cfg(not(feature = "server_only"))]
 use crate::commands::{CodexOAuthState, CopilotAuthState};
+#[cfg(not(feature = "server_only"))]
 use crate::proxy::providers::codex_oauth_auth::CodexOAuthManager;
+#[cfg(not(feature = "server_only"))]
 use crate::proxy::providers::copilot_auth::CopilotAuthManager;
+#[cfg(not(feature = "server_only"))]
+use super::providers::AuthInfo;
 use crate::{app_config::AppType, provider::Provider};
 use futures::StreamExt;
 use http::Extensions;
@@ -930,7 +936,7 @@ impl RequestForwarder {
         adapter: &dyn ProviderAdapter,
     ) -> Result<(ProxyResponse, Option<String>), ProxyError> {
         // 使用适配器提取 base_url
-        let mut base_url = adapter.extract_base_url(provider)?;
+        let base_url = adapter.extract_base_url(provider)?;
 
         let is_full_url = provider
             .meta
@@ -1191,10 +1197,13 @@ impl RequestForwarder {
             needs_transform || codex_responses_to_chat || request_is_streaming;
 
         // Codex OAuth 需要注入的 ChatGPT-Account-Id（在动态 token 获取期间填充）
-        let mut codex_oauth_account_id: Option<String> = None;
-        let mut should_send_codex_oauth_session_headers = false;
+        // [Custom] server_only 模式: 无 OAuth，始终为 None/false
+        let codex_oauth_account_id: Option<String> = None;
+        let should_send_codex_oauth_session_headers = false;
 
         // 获取认证头（提前准备，用于内联替换）
+        // [Custom] server_only 模式: allow unused_mut
+        #[cfg_attr(feature = "server_only", allow(unused_mut))]
         let mut auth_headers = if let Some(mut auth) = adapter.extract_auth(provider) {
             // GitHub Copilot 特殊处理：从 CopilotAuthManager 获取真实 token
             if auth.strategy == AuthStrategy::GitHubCopilot {
@@ -1799,6 +1808,8 @@ impl RequestForwarder {
 
     /// 用 Copilot live `/models` 列表确认 model ID 真实可用，找不到时按 family 降级。
     /// 命中缓存后是同步的；首次请求或 5 min 缓存过期后会触发一次 HTTP。
+    // [Custom] server_only 模式: 无 app_handle
+    #[allow(unused_variables)]
     async fn apply_copilot_live_model_resolution(
         &self,
         provider: &Provider,
@@ -1845,6 +1856,8 @@ impl RequestForwarder {
         }
     }
 
+    // [Custom] server_only 模式: 无 app_handle
+    #[allow(unused_variables)]
     async fn is_copilot_openai_vendor_model(&self, provider: &Provider, model_id: &str) -> bool {
         #[cfg(not(feature = "server_only"))]
         {
