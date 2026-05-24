@@ -4,6 +4,7 @@
 //! 将 POST /api/{command} 请求分派到对应的 commands::* 函数。
 //! 负责从 JSON 请求体中提取类型化参数，调用命令函数，并将结果序列化为 HTTP 响应。
 
+use std::fmt::Display;
 use std::sync::{Arc, OnceLock};
 use axum::{
     extract::Request,
@@ -126,16 +127,22 @@ fn req_usize(args: &Option<Value>, key: &str) -> Result<usize, String> {
 // ============================================================================
 
 /// 将 Result<T, E> 转为 HTTP 响应，其中 T: Serialize
-fn json_ok<T: serde::Serialize>(result: Result<T, impl IntoResponse>) -> Response {
+fn json_ok<T: serde::Serialize, E: IntoResponse + Display>(result: Result<T, E>) -> Response {
     match result {
         Ok(val) => Json(serde_json::to_value(val).unwrap_or_default()).into_response(),
         Err(err) => {
+            let message = err.to_string();
             let resp = err.into_response();
-            if resp.status() == axum::http::StatusCode::OK {
-                (axum::http::StatusCode::INTERNAL_SERVER_ERROR, resp).into_response()
+            let status = if resp.status() == axum::http::StatusCode::OK {
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR
             } else {
-                resp
-            }
+                resp.status()
+            };
+            (
+                status,
+                Json(serde_json::json!({"error": message})),
+            )
+                .into_response()
         },
     }
 }
@@ -1365,7 +1372,7 @@ async fn dispatch_inner(command: &str, state: Arc<AppState>, args: Option<Value>
         // ====================================================================
         "update_tray_menu" => {
             // Tray menu is not applicable in server mode
-            json_ok::<bool>(Ok::<bool, String>(true))
+            json_ok::<bool, String>(Ok::<bool, String>(true))
         }
 
         // ====================================================================

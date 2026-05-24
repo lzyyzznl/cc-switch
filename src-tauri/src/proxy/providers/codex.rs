@@ -5,6 +5,7 @@
 //! ## 客户端检测
 //! 支持检测官方 Codex 客户端 (codex_vscode, codex_cli_rs)
 
+use serde_json::Value;
 use super::{AuthInfo, AuthStrategy, ProviderAdapter};
 use crate::provider::Provider;
 use crate::proxy::error::ProxyError;
@@ -18,6 +19,36 @@ static CODEX_CLIENT_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(codex_vscode|codex_cli_rs)/[\d.]+").unwrap());
 
 /// Codex 适配器
+/// Normalize non-standard chat message roles for Codex compatibility.
+///
+/// Codex only supports: system, user, assistant, tool, latest_reminder.
+/// Non-standard roles (e.g., `developer`) are mapped to `user`, following ccx's approach.
+pub fn normalize_codex_chat_roles(body: &mut Value) {
+    let Some(messages) = body.get_mut("messages").and_then(|m| m.as_array_mut()) else {
+        return;
+    };
+    for msg in messages.iter_mut() {
+        let Some(role) = msg.get("role").and_then(|v| v.as_str()) else {
+            if let Some(obj) = msg.as_object_mut() {
+                obj.insert("role".to_string(), Value::String("user".to_string()));
+            }
+            continue;
+        };
+        if matches!(role, "system" | "user" | "assistant" | "tool") {
+            continue;
+        }
+        if msg.get("tool_call_id").is_some() {
+            if let Some(obj) = msg.as_object_mut() {
+                obj.insert("role".to_string(), Value::String("tool".to_string()));
+            }
+            continue;
+        }
+        if let Some(obj) = msg.as_object_mut() {
+            obj.insert("role".to_string(), Value::String("user".to_string()));
+        }
+    }
+}
+
 pub struct CodexAdapter;
 
 /// Whether this Codex provider's real upstream should be called through

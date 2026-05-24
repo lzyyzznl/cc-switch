@@ -44,6 +44,12 @@ pub async fn start_server() {
         .await
         .expect("Failed to initialize services");
 
+    // 自动启动代理服务器（处理 OpenAI/Chat API 路由）
+    match state.proxy_service.start().await {
+        Ok(info) => log::info!("代理服务器已启动: {}:{}", info.address, info.port),
+        Err(e) => log::warn!("代理服务器启动失败（可稍后手动启动）: {e}"),
+    }
+
     let port = std::env::var("CC_SWITCH_PORT").unwrap_or_else(|_| "10245".to_string());
 
     let cors = tower_http::cors::CorsLayer::permissive();

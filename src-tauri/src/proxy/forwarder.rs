@@ -30,6 +30,7 @@ use crate::proxy::providers::codex_oauth_auth::CodexOAuthManager;
 use crate::proxy::providers::copilot_auth::CopilotAuthManager;
 #[cfg(not(feature = "server_only"))]
 use super::providers::AuthInfo;
+use super::providers::codex::normalize_codex_chat_roles;
 use crate::{app_config::AppType, provider::Provider};
 use futures::StreamExt;
 use http::Extensions;
@@ -1182,7 +1183,11 @@ impl RequestForwarder {
 
         // 过滤私有参数（以 `_` 开头的字段），防止内部信息泄露到上游
         // 默认使用空白名单，过滤所有 _ 前缀字段
-        let filtered_body = prepare_upstream_request_body(request_body);
+        let mut filtered_body = prepare_upstream_request_body(request_body);
+        // Codex: normalize non-standard chat roles (e.g. developer → user)
+        if matches!(app_type, AppType::Codex) {
+            normalize_codex_chat_roles(&mut filtered_body);
+        }
         log_prompt_cache_trace(
             app_type,
             provider,

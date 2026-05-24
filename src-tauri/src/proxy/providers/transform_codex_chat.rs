@@ -122,6 +122,7 @@ fn append_responses_input_as_chat_messages(
     messages: &mut Vec<Value>,
 ) -> Result<(), ProxyError> {
     let mut pending_tool_calls = Vec::new();
+    let mut pending_reasoning: Option<String> = None;
 
     match input {
         Value::String(text) => {
@@ -132,16 +133,17 @@ fn append_responses_input_as_chat_messages(
         }
         Value::Array(items) => {
             for item in items {
-                append_responses_item_as_chat_message(item, messages, &mut pending_tool_calls)?;
+                append_responses_item_as_chat_message(item, messages, &mut pending_tool_calls, &mut pending_reasoning)?;
             }
         }
         Value::Object(_) => {
-            append_responses_item_as_chat_message(input, messages, &mut pending_tool_calls)?;
+            append_responses_item_as_chat_message(input, messages, &mut pending_tool_calls, &mut pending_reasoning)?;
         }
         _ => {}
     }
 
-    flush_pending_tool_calls(messages, &mut pending_tool_calls);
+    flush_pending_tool_calls(messages, &mut pending_tool_calls, &mut pending_reasoning);
+    flush_pending_reasoning(messages, &mut pending_reasoning);
     Ok(())
 }
 
@@ -149,14 +151,19 @@ fn append_responses_item_as_chat_message(
     item: &Value,
     messages: &mut Vec<Value>,
     pending_tool_calls: &mut Vec<Value>,
+    pending_reasoning: &mut Option<String>,
 ) -> Result<(), ProxyError> {
     let item_type = item.get("type").and_then(|v| v.as_str());
+    log::debug!("append_responses_item_as_chat_message: type={:?}, role={:?}, has_content={}",
+        item_type,
+        item.get("role").and_then(|v| v.as_str()),
+        item.get("content").is_some());
     match item_type {
         Some("function_call") => {
             pending_tool_calls.push(responses_function_call_to_chat_tool_call(item));
         }
         Some("function_call_output") => {
-            flush_pending_tool_calls(messages, pending_tool_calls);
+            flush_pending_tool_calls(messages, pending_tool_calls, pending_reasoning);
             let call_id = item.get("call_id").and_then(|v| v.as_str()).unwrap_or("");
             let output = match item.get("output") {
                 Some(Value::String(s)) => s.clone(),
@@ -170,19 +177,45 @@ fn append_responses_item_as_chat_message(
             }));
         }
         Some("reasoning") => {
-            // Reasoning items are Responses-specific context. Chat-only providers
-            // cannot consume encrypted reasoning state, so omit it.
+            if let Some(summary_text) = extract_reasoning_summary_text(item) {
+                if let Some(existing) = pending_reasoning {
+                    existing.push_str("\n");
+                    existing.push_str(&summary_text);
+                } else {
+                    *pending_reasoning = Some(summary_text);
+                }
+            }
         }
         Some("message") | None => {
-            flush_pending_tool_calls(messages, pending_tool_calls);
+            flush_pending_tool_calls(messages, pending_tool_calls, pending_reasoning);
             if item.get("role").is_some() || item.get("content").is_some() {
-                messages.push(responses_message_item_to_chat_message(item));
+                let mut msg = responses_message_item_to_chat_message(item);
+                if let Some(reasoning) = pending_reasoning.take() {
+                    if !reasoning.is_empty() {
+                        if msg.get("role").and_then(|v| v.as_str()) == Some("assistant") {
+                            msg["reasoning_content"] = json!(reasoning);
+                        } else {
+                            messages.push(json!({"role": "assistant", "content": "", "reasoning_content": reasoning}));
+                        }
+                    }
+                }
+                messages.push(msg);
             }
         }
         _ => {
-            flush_pending_tool_calls(messages, pending_tool_calls);
+            flush_pending_tool_calls(messages, pending_tool_calls, pending_reasoning);
             if item.get("role").is_some() || item.get("content").is_some() {
-                messages.push(responses_message_item_to_chat_message(item));
+                let mut msg = responses_message_item_to_chat_message(item);
+                if let Some(reasoning) = pending_reasoning.take() {
+                    if !reasoning.is_empty() {
+                        if msg.get("role").and_then(|v| v.as_str()) == Some("assistant") {
+                            msg["reasoning_content"] = json!(reasoning);
+                        } else {
+                            messages.push(json!({"role": "assistant", "content": "", "reasoning_content": reasoning}));
+                        }
+                    }
+                }
+                messages.push(msg);
             }
         }
     }
@@ -190,16 +223,45 @@ fn append_responses_item_as_chat_message(
     Ok(())
 }
 
-fn flush_pending_tool_calls(messages: &mut Vec<Value>, pending_tool_calls: &mut Vec<Value>) {
+fn flush_pending_tool_calls(messages: &mut Vec<Value>, pending_tool_calls: &mut Vec<Value>, pending_reasoning: &mut Option<String>) {
     if pending_tool_calls.is_empty() {
         return;
     }
 
-    messages.push(json!({
+    let mut msg = json!({
         "role": "assistant",
         "content": null,
         "tool_calls": std::mem::take(pending_tool_calls)
-    }));
+    });
+
+    // Attach any pending reasoning to this assistant message
+    if let Some(reasoning) = pending_reasoning.take() {
+        if !reasoning.is_empty() {
+            msg["reasoning_content"] = json!(reasoning);
+        }
+    }
+
+    messages.push(msg);
+}
+fn flush_pending_reasoning(messages: &mut Vec<Value>, pending_reasoning: &mut Option<String>) {
+    let Some(reasoning) = pending_reasoning.take() else {
+        return;
+    };
+    if reasoning.is_empty() {
+        return;
+    }
+    if let Some(last) = messages.last_mut() {
+        if last.get("role").and_then(|v| v.as_str()) == Some("assistant") {
+            if !last.get("reasoning_content").and_then(|v| v.as_str()).unwrap_or("").is_empty() {
+                let existing = last["reasoning_content"].as_str().unwrap_or("").to_string();
+                last["reasoning_content"] = json!(existing + "\n" + &reasoning);
+            } else {
+                last["reasoning_content"] = json!(reasoning);
+            }
+            return;
+        }
+    }
+    messages.push(json!({"role": "assistant", "content": "", "reasoning_content": reasoning}));
 }
 
 fn responses_message_item_to_chat_message(item: &Value) -> Value {
@@ -209,12 +271,20 @@ fn responses_message_item_to_chat_message(item: &Value) -> Value {
         .map(|value| responses_content_to_chat_content(role, value))
         .unwrap_or(Value::Null);
 
-    json!({
+    let mut msg = json!({
         "role": role,
         "content": content
-    })
-}
+    });
 
+    // Preserve reasoning_content if present on the message item
+    if let Some(rc) = item.get("reasoning_content").and_then(|v| v.as_str()) {
+        if !rc.is_empty() {
+            msg["reasoning_content"] = json!(rc);
+        }
+    }
+
+    msg
+}
 fn responses_content_to_chat_content(_role: &str, content: &Value) -> Value {
     if content.is_null() || content.is_string() {
         return content.clone();
@@ -412,6 +482,22 @@ fn chat_reasoning_to_response_output_item(message: &Value, response_id: &str) ->
             "text": reasoning
         }]
     }))
+}
+
+/// Extract human-readable summary text from a Codex reasoning item.
+/// Extract human-readable summary text from a Codex reasoning item.
+fn extract_reasoning_summary_text(item: &Value) -> Option<String> {
+    let parts = item.get("summary")?.as_array()?;
+    let texts: Vec<&str> = parts
+        .iter()
+        .filter_map(|p| p.get("text").and_then(|t| t.as_str()))
+        .filter(|t| !t.is_empty())
+        .collect();
+    if texts.is_empty() {
+        None
+    } else {
+        Some(texts.join("\n"))
+    }
 }
 
 fn chat_reasoning_text(message: &Value) -> Option<String> {
